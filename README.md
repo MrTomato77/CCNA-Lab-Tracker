@@ -36,4 +36,3 @@ Note: Use forward slashes `/` not backslashes `\`.
 
 To back up progress: copy `database/labs.db` somewhere safe.
 To restore: replace `database/labs.db` with your backup.
-# CCNA-Lab-Tracker
