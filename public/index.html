@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CCNA Lab Tracker</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Chart.js MUST load before Alpine (synchronous) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <!-- Alpine MUST be last, with defer -->
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body x-data="appShell()" x-init="init()">
+
+  <nav>
+    <span class="app-title">CCNA Lab Tracker</span>
+    <button @click="page='dashboard'" :class="{active: page==='dashboard'}">Dashboard</button>
+    <button @click="page='import'"    :class="{active: page==='import'}">Import Labs</button>
+    <button @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
+  </nav>
+
+  <!-- DASHBOARD -->
+  <div class="page" x-show="page==='dashboard'">
+    <div x-show="loading" class="loading">Loading labs...</div>
+    <template x-if="!loading">
+      <div>
+        <div class="summary-bar">
+          <span x-text="`${summary.done} / ${summary.total} Completed`" style="font-size:14px;font-weight:600"></span>
+          <div class="progress-track"><div class="progress-fill" :style="`width:${summary.completion_percent}%`"></div></div>
+          <span x-text="`${summary.completion_percent}%`" style="font-size:13px;color:var(--text-muted)"></span>
+          <span x-text="`⏱ ${formatTotalTime(summary.total_time_spent)}`" style="font-size:12px;color:var(--text-muted)"></span>
+        </div>
+        <div class="filter-tabs">
+          <button @click="filterCat=''" :class="{active:filterCat===''}">All (51)</button>
+          <template x-for="cat in categories" :key="cat">
+            <button @click="filterCat=cat" :class="{active:filterCat===cat}" x-text="cat"></button>
+          </template>
+        </div>
+        <input type="text" x-model="search" placeholder="Search by name or ID..." class="search-input">
+        <div class="cards-grid">
+          <template x-for="lab in filteredLabs" :key="lab.id">
+            <div x-data="labCard(lab)" x-init="init()" :class="cardClass()">
+              <div class="card-header">
+                <span class="lab-id" x-text="lab.id"></span>
+                <span :class="badgeClass()" x-text="statusLabel()"></span>
+              </div>
+              <div class="lab-name" x-text="lab.name"></div>
+              <div class="lab-category" x-text="lab.category"></div>
+              <div class="timer-section">
+                <span class="timer-display" x-text="formatTime(elapsed)"></span>
+                <div class="timer-btns">
+                  <button @click="startTimer()" x-show="!running" class="btn-icon" title="Start">▶</button>
+                  <button @click="stopTimer()"  x-show="running"  class="btn-icon btn-stop" title="Stop">⏹</button>
+                  <button @click="resetTimer()"                    class="btn-icon" title="Reset">↺</button>
+                </div>
+              </div>
+              <div class="timer-meta">Total: <span x-text="formatTime(lab.time_spent)"></span></div>
+              <select x-model="lab.status" @change="updateStatus()" class="status-select">
+                <option value="not_started">Not Started</option>
+                <option value="in_progress">In Progress</option>
+                <option value="done">Done</option>
+              </select>
+              <button @click="launch()" class="btn-launch"
+                :disabled="!lab.file_path"
+                :title="lab.file_path ? 'Open in Packet Tracer' : 'Import this lab first'"
+                x-text="lab.file_path ? '▶ Launch in Packet Tracer' : '⚠ Not Imported — Go to Import'">
+              </button>
+              <div x-show="toast" x-text="toastMsg" class="toast" x-transition></div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- IMPORT PAGE -->
+  <div class="page" x-show="page==='import'" x-data="importPage()" x-init="loadStatus()">
+    <h2 style="font-size:18px;margin-bottom:20px">Import Lab Files</h2>
+    <div class="import-section">
+      <h3>Method 1 — Upload Files (drag & drop or browse)</h3>
+      <div class="dropzone"
+        @dragover.prevent="dragging=true"
+        @dragleave.prevent="dragging=false"
+        @drop.prevent="handleDrop($event)"
+        :class="{dragging}">
+        <p>Drag & drop .pka files here</p>
+        <p>or</p>
+        <input type="file" id="fileInput" multiple accept=".pka" @change="handleFileInput($event)">
+        <label for="fileInput" class="btn-upload">Browse Files</label>
+      </div>
+    </div>
+    <div class="import-section">
+      <h3>Method 2 — Scan Folder</h3>
+      <div class="folder-input-row">
+        <input type="text" x-model="folderPath" class="folder-input"
+               placeholder="e.g. D:\CCNA Network Labs Professional\Labs">
+        <button @click="scanFolder()" :disabled="scanning" class="btn-scan">
+          <span x-show="!scanning">Scan Folder</span>
+          <span x-show="scanning">Scanning...</span>
+        </button>
+      </div>
+    </div>
+    <template x-if="results.length > 0">
+      <div class="import-results">
+        <h3 x-text="`Results — ${importedCount} / ${results.length} imported`"></h3>
+        <template x-for="r in results" :key="r.file">
+          <div class="result-row" :class="`result--${r.status}`">
+            <span x-text="r.status==='imported'?'✅':r.status==='skipped'?'⚠️':'❌'"></span>
+            <span x-text="r.file"></span>
+            <span class="result-detail" x-text="r.lab_id ?? r.reason"></span>
+          </div>
+        </template>
+        <button @click="window.dispatchEvent(new CustomEvent('refresh-labs')); page='dashboard'" class="btn-primary">
+          Go to Dashboard
+        </button>
+      </div>
+    </template>
+    <div class="import-section" style="margin-top:20px">
+      <h3 x-text="`Current Status — ${status.imported_count} / ${status.total} imported`"></h3>
+      <template x-for="lab in status.missing" :key="lab.id">
+        <div class="missing-row">
+          <span class="lab-id" x-text="lab.id"></span>
+          <span x-text="lab.name" style="flex:1;font-size:12px"></span>
+          <span class="badge badge--not-imported">Missing</span>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- ANALYTICS PAGE -->
+  <div class="page" x-show="page==='stats'" x-data="statsPage()" x-init="load()">
+    <h2 style="font-size:18px;margin-bottom:20px">Analytics</h2>
+    <div x-show="loading" class="loading">Loading analytics...</div>
+    <template x-if="!loading">
+      <div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-num" x-text="summary.done"></div><div>Done</div></div>
+          <div class="stat-card"><div class="stat-num" x-text="summary.in_progress"></div><div>In Progress</div></div>
+          <div class="stat-card"><div class="stat-num" x-text="summary.not_started"></div><div>Not Started</div></div>
+          <div class="stat-card"><div class="stat-num" x-text="formatTime(summary.total_time_spent)"></div><div>Total Time</div></div>
+        </div>
+        <canvas id="timeChart" height="80"></canvas>
+        <div class="category-bars" style="margin-top:24px">
+          <template x-for="cat in byCategory" :key="cat.category">
+            <div class="cat-row">
+              <span x-text="cat.category"></span>
+              <div class="cat-track">
+                <div class="cat-fill" :style="`width:${cat.total>0?(cat.done/cat.total)*100:0}%`"></div>
+              </div>
+              <span x-text="`${cat.done}/${cat.total}`"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
+  </div>
+
+</body>
+</html>
