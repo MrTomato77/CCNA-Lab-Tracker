@@ -27,10 +27,15 @@ async def launch_pka(file_path: str | None) -> dict:
                 "code": "PT_NOT_FOUND"}
 
     try:
-        subprocess.Popen([str(pt), str(pka)], shell=False)
-        logger.info(f"Launched {pka.name}")
+        # Try to launch Packet Tracer
+        process = subprocess.Popen([str(pt), str(pka)], shell=False)
+        logger.info(f"Launched {pka.name} with PID {process.pid}")
         return {"success": True}
-    except PermissionError:
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        return {"success": False, "error": f"File not found: {str(e)}", "code": "FILE_NOT_FOUND"}
+    except PermissionError as e:
+        logger.error(f"Permission denied: {e}")
         return {"success": False, "error": "Permission denied launching Packet Tracer.",
                 "code": "PT_PERMISSION_ERROR"}
     except Exception as e:

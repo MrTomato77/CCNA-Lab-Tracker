@@ -66,3 +66,12 @@ async def get_file_path(lab_id: str) -> str | None:
     async with db.execute("SELECT file_path FROM labs WHERE id=?", (lab_id,)) as cur:
         row = await cur.fetchone()
     return row["file_path"] if row else None
+
+async def reset_all_labs():
+    """Reset all labs to Not Started status and clear all timer data."""
+    db = await get_db()
+    await db.execute(
+        "UPDATE progress SET status='not_started', time_spent=0, last_opened=NULL"
+    )
+    await db.execute("DELETE FROM attempts")
+    await db.commit()
