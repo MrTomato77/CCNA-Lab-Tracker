@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
-from robyn import Robyn, Request
+from robyn import Robyn, Request, Response
 from robyn.logger import logger
+from robyn.responses import serve_html
 from dotenv import load_dotenv
 from rich import print as rprint
 from database.connection import init_db, close_db
@@ -10,13 +11,32 @@ from routers import labs, progress, launcher, stats, importer
 load_dotenv()
 app = Robyn(__file__)
 
-# Static files — MUST be registered before routers
-# Do NOT add any GET "/" route — it will conflict with serve_directory
-app.serve_directory(
-    route="/",
-    directory_path=str(Path(__file__).parent / "public"),
-    index_file="index.html",
-)
+PUBLIC = Path(__file__).parent / "public"
+
+# Static assets are served via explicit routes instead of serve_directory("/").
+# In Robyn 0.64.x, serve_directory mounted at "/" intercepts non-GET methods
+# on every URL beneath it (including /api/...) and returns 405 Method Not
+# Allowed before any registered POST route can match. Three explicit GET
+# routes for the SPA shell + two static assets sidesteps that entirely.
+@app.get("/")
+async def index(request: Request):
+    return serve_html(str(PUBLIC / "index.html"))
+
+@app.get("/style.css")
+async def style_css(request: Request):
+    return Response(
+        status_code=200,
+        headers={"Content-Type": "text/css; charset=utf-8"},
+        description=(PUBLIC / "style.css").read_text(encoding="utf-8"),
+    )
+
+@app.get("/app.js")
+async def app_js(request: Request):
+    return Response(
+        status_code=200,
+        headers={"Content-Type": "application/javascript; charset=utf-8"},
+        description=(PUBLIC / "app.js").read_text(encoding="utf-8"),
+    )
 
 # Register routers
 app.include_router(labs.router)
