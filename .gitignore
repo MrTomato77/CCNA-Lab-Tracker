@@ -8,3 +8,5 @@ __pycache__/
 *.db
 
 labs_files/
+
+.playwright-mcp/
