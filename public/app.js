@@ -157,10 +157,27 @@ window.labCard = function(initialLab) {
     },
 
     resetTimer() {
-      clearInterval(this.interval);
+      if (this.interval) clearInterval(this.interval);
       this.running = false;
       this.elapsed = 0;
       this.sessionStart = null;
+    },
+
+    async resetLab() {
+      if (!confirm(`Reset progress and time for ${this.lab.id}?`)) return;
+      try {
+        const res = await fetch(`/api/labs/reset-single/${this.lab.id}`, { method: "POST" });
+        const json = await res.json();
+        if (json.success) {
+          this.lab.status = 'not_started';
+          this.lab.time_spent = 0;
+          this.resetTimer();
+          await Alpine.store("app").refreshSummary();
+          window.showToast("+ Lab reset successful", 'success');
+        }
+      } catch (e) {
+        window.showToast("× Failed to reset lab", 'error');
+      }
     },
 
     async updateStatus(newStatus = null) {
@@ -190,6 +207,10 @@ window.labCard = function(initialLab) {
     },
 
     async launch() {
+      if (this.running) {
+        await this.stopTimer();
+        return;
+      }
       if (!this.lab.file_path) {
         window.showToast("! Import this lab first. Go to Import page.", 'error');
         return;

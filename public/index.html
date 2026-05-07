@@ -52,6 +52,7 @@
         <div class="cards-grid">
           <template x-for="lab in filteredLabs" :key="lab.id">
             <div x-data="labCard(lab)" x-init="init()" :class="cardClass()">
+              <button @click="resetLab()" class="btn-reset-single" title="Reset this lab" x-show="lab.status === 'done'">⟳</button>
               <div class="card-header">
                 <div>
                   <span class="lab-id" x-text="lab.id"></span>
@@ -68,19 +69,17 @@
                 <!-- Timer Column -->
                 <div class="card-timer">
                   <div class="timer-section">
-                    <span class="timer-display" x-text="formatTime(elapsed)"></span>
-                    <div class="timer-btns">
-                      <button @click="stopTimer()"  x-show="running"  class="btn-icon btn-stop" title="Stop">■</button>
-                    </div>
+                    <span class="timer-display" x-text="formatTime(running ? elapsed : lab.time_spent)"></span>
                   </div>
                 </div>
                 
                 <!-- Launch Column -->
                 <div class="card-launch">
                   <button @click="launch()" class="btn-launch"
-                    :disabled="!lab.file_path"
-                    :title="lab.file_path ? 'Open in Packet Tracer' : 'Import this lab first'"
-                    x-text="lab.file_path ? '▶ Launch' : '! Not Imported'">
+                    :class="{'btn-finish': running, 'btn-done': lab.status === 'done' && !running}"
+                    :disabled="!lab.file_path || (lab.status === 'done' && !running)"
+                    :title="!lab.file_path ? 'Import this lab first' : (running ? 'Finish lab' : (lab.status === 'done' ? 'Lab completed' : 'Open in Packet Tracer'))"
+                    x-text="running ? '■ Finish' : (lab.status === 'done' ? '✓ Done' : '▶ Launch')">
                   </button>
                   <button @click="openDocs()" class="btn-docs"
                     :disabled="!lab.docs_path"

@@ -75,3 +75,13 @@ async def reset_all_labs():
     )
     await db.execute("DELETE FROM attempts")
     await db.commit()
+
+async def reset_lab(lab_id: str):
+    """Reset a specific lab to Not Started and clear its attempts."""
+    db = await get_db()
+    await db.execute(
+        "UPDATE progress SET status='not_started', time_spent=0, last_opened=NULL WHERE lab_id=?",
+        (lab_id,)
+    )
+    await db.execute("DELETE FROM attempts WHERE lab_id=?", (lab_id,))
+    await db.commit()

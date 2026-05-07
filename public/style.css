@@ -61,7 +61,7 @@ nav button.active { border-color: var(--accent); color: var(--accent); backgroun
 .lab-card { background: var(--surface); border: 1px solid var(--border);
             border-left: 4px solid var(--not-started);
             border-radius: var(--radius); padding: 12px; display: flex;
-            flex-direction: column; gap: 8px; }
+            flex-direction: column; gap: 8px; position: relative; }
 
 .card-content { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: start; }
 .card-detail { flex: 1; }
@@ -101,21 +101,32 @@ nav button.active { border-color: var(--accent); color: var(--accent); backgroun
 /* ── Launch button ──────────────────────────────────── */
 .btn-launch { padding: 4px 8px; border: 1px solid var(--accent); border-radius: var(--radius);
               background: transparent; color: var(--accent); cursor: pointer;
-              font-size: 11px; font-weight: 600; flex: 1; }
+              font-size: 11px; font-weight: 600; min-width: 80px; text-align: center; }
 .btn-launch:hover    { background: var(--accent); color: #fff; }
 .btn-launch:disabled { border-color: var(--border); color: var(--text-muted); cursor: not-allowed; }
+
+.btn-launch.btn-finish { border-color: #f59e0b; color: #f59e0b; }
+.btn-launch.btn-finish:hover { background: #f59e0b; color: #fff; }
+
+.btn-launch.btn-done { border-color: #10b981; color: #10b981; background: #ecfdf5; opacity: 0.8; cursor: default; }
 
 /* ── Reset button ────────────────────────────────────── */
 .btn-reset { padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius);
              background: transparent; cursor: pointer; font-size: 13px; color: #ef4444; }
 .btn-reset:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
 
+.btn-reset-single { background: transparent; border: none; color: var(--text-muted);
+                    cursor: pointer; font-size: 14px; position: absolute; top: 12px; right: 12px;
+                    transition: color 0.2s, transform 0.2s; padding: 4px 0; z-index: 10;
+                    width: 26px; text-align: center; }
+.btn-reset-single:hover { color: #ef4444; transform: rotate(90deg); }
+
 /* ── Docs button (small icon, secondary action) ─ */
-.btn-docs { padding: 4px 6px;
+.btn-docs { padding: 4px 0;
             border: 1px solid var(--border); border-radius: var(--radius);
             background: transparent; color: var(--text-muted); cursor: pointer;
-            font-size: 12px; font-weight: 600; width: auto; flex-shrink: 0;
-            box-sizing: border-box; font-family: var(--font-body); }
+            font-size: 12px; font-weight: 600; width: 26px; flex-shrink: 0;
+            box-sizing: border-box; font-family: var(--font-body); text-align: center; }
 .btn-docs:hover           { border-color: var(--accent); color: var(--accent); }
 .btn-docs:disabled        { opacity: 0.4; cursor: not-allowed; }
 .btn-docs:disabled:hover  { border-color: var(--border); color: var(--text-muted); }

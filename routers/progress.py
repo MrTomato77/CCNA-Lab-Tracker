@@ -1,7 +1,7 @@
 from robyn import Request, SubRouter
 from pydantic import ValidationError
 from models.schemas import StatusUpdate, TimerSave
-from services.lab_service import update_status, get_lab_by_id
+from services.lab_service import update_status, get_lab_by_id, reset_lab
 from services.timer_service import save_timer_session
 
 router = SubRouter(__name__, prefix="/api/labs")
@@ -29,3 +29,12 @@ async def save_timer(request: Request):
         return {"success": False, "error": e.errors()[0]["msg"], "code": "VALIDATION_ERROR"}, 422
     total = await save_timer_session(lab_id, data.started_at, data.duration)
     return {"success": True, "data": {"lab_id": lab_id, "time_spent": total}}
+
+@router.post("/reset-single/:lab_id")
+async def reset_single(request: Request):
+    lab_id = request.path_params.get("lab_id")
+    try:
+        await reset_lab(lab_id)
+        return {"success": True, "message": f"Lab {lab_id} has been reset"}
+    except Exception as e:
+        return {"success": False, "error": str(e), "code": "RESET_FAILED"}, 500
