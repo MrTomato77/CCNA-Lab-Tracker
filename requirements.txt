@@ -1,6 +1,6 @@
-robyn
+robyn==0.64.4
 aiosqlite
-pydantic
+pydantic>=2.0
 loguru
 python-dotenv
 rich
