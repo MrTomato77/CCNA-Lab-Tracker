@@ -39,15 +39,20 @@ nav button.active { border-color: var(--accent); color: var(--accent); backgroun
 .progress-fill  { height: 100%; background: var(--accent); border-radius: 99px; transition: width .4s; }
 
 /* ── Filter tabs ────────────────────────────────────── */
-.filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .filter-tabs button { padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border);
-                      background: transparent; cursor: pointer; font-size: 12px; }
+                      background: transparent; cursor: pointer; font-size: 12px; transition: all 0.2s; }
 .filter-tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-/* ── Search ─────────────────────────────────────────── */
-.search-input { width: 100%; max-width: 360px; padding: 8px 12px; margin-bottom: 20px;
-                border: 1px solid var(--border); border-radius: var(--radius);
-                font-size: 13px; background: var(--surface); }
+/* ── Filter Row ─────────────────────────────────────── */
+.filter-row { display: flex; justify-content: space-between; align-items: center;
+              margin-bottom: 20px; gap: 16px; }
+
+.status-filter { padding: 6px 12px; border-radius: var(--radius); border: 1px solid var(--border);
+                 background: var(--surface); font-size: 13px; color: var(--text-muted);
+                 cursor: pointer; outline: none; transition: border-color 0.2s; }
+.status-filter:hover { border-color: var(--accent); }
+.status-filter:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(4, 159, 212, 0.1); }
 
 /* ── Cards grid ─────────────────────────────────────── */
 .cards-grid { display: flex; flex-direction: column; gap: 12px; }

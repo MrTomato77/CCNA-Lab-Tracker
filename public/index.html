@@ -36,13 +36,19 @@
           <span x-text="`${summary.completion_percent}%`" style="font-size:13px;color:var(--text-muted)"></span>
           <span x-text="`⏲ ${formatTotalTime(summary.total_time_spent)}`" style="font-size:12px;color:var(--text-muted)"></span>
         </div>
-        <div class="filter-tabs">
-          <button @click="filterCat=''" :class="{active:filterCat===''}">All (51)</button>
-          <template x-for="cat in categories" :key="cat">
-            <button @click="filterCat=cat" :class="{active:filterCat===cat}" x-text="cat"></button>
-          </template>
+        <div class="filter-row">
+          <div class="filter-tabs">
+            <button @click="filterCat=''" :class="{active:filterCat===''}">All (51)</button>
+            <template x-for="cat in categories" :key="cat">
+              <button @click="filterCat=cat" :class="{active:filterCat===cat}" x-text="cat"></button>
+            </template>
+          </div>
+          <select x-model="hideStatus" class="status-filter">
+            <option value="">Show All</option>
+            <option value="done">Hide Done</option>
+            <option value="undone">Hide Undone</option>
+          </select>
         </div>
-        <input type="text" x-model="search" placeholder="Search by name or ID..." class="search-input">
         <div class="cards-grid">
           <template x-for="lab in filteredLabs" :key="lab.id">
             <div x-data="labCard(lab)" x-init="init()" :class="cardClass()">
@@ -51,7 +57,6 @@
                   <span class="lab-id" x-text="lab.id"></span>
                   <span class="lab-category" x-text="lab.category" style="font-size:10px;color:var(--text-muted);margin-left:8px"></span>
                 </div>
-                <span :class="badgeClass()" x-text="statusLabel()"></span>
               </div>
               
               <div class="card-content">

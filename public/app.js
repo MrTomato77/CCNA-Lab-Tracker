@@ -22,7 +22,7 @@ window.appShell = function() {
     loading: true,
     labs: [],
     filterCat: "",
-    search: "",
+    hideStatus: "",
     categories: [
       "CLI & Basic", "Switching & VLAN", "Wireless",
       "Inter-VLAN & Routing", "HSRP & ACL", "NAT & DHCP",
@@ -70,11 +70,14 @@ window.appShell = function() {
 
     get filteredLabs() {
       const cat = this.filterCat;
-      const q   = this.search.toLowerCase();
-      return this.labs.filter(lab =>
-        (!cat || lab.category === cat) &&
-        (!q   || lab.name.toLowerCase().includes(q) || lab.id.toLowerCase().includes(q))
-      );
+      const hide = this.hideStatus;
+      return this.labs.filter(lab => {
+        const matchCat = !cat || lab.category === cat;
+        let matchStatus = true;
+        if (hide === 'done') matchStatus = lab.status !== 'done';
+        if (hide === 'undone') matchStatus = lab.status === 'done';
+        return matchCat && matchStatus;
+      });
     },
 
     formatTotalTime(s = 0) {
