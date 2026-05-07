@@ -10,3 +10,5 @@ __pycache__/
 labs_files/
 
 .playwright-mcp/
+
+*.pdf
