@@ -7,7 +7,7 @@ async def get_all_labs() -> list[dict]:
     # Including it here lets the dashboard render 51 cards from ONE request
     # instead of 51 follow-up GET /api/labs/{id} fetches for attempt history.
     async with db.execute("""
-        SELECT l.id, l.name, l.category, l.file_path,
+        SELECT l.id, l.name, l.category, l.file_path, l.docs_path,
                p.status, p.time_spent, p.last_opened,
                (SELECT started_at FROM attempts a
                 WHERE a.lab_id = l.id AND a.duration IS NULL
@@ -21,7 +21,7 @@ async def get_all_labs() -> list[dict]:
 async def get_lab_by_id(lab_id: str) -> dict | None:
     db = await get_db()
     async with db.execute("""
-        SELECT l.id, l.name, l.category, l.file_path,
+        SELECT l.id, l.name, l.category, l.file_path, l.docs_path,
                p.status, p.time_spent, p.last_opened
         FROM labs l
         JOIN progress p ON l.id = p.lab_id

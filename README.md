@@ -29,7 +29,7 @@ Note: Use forward slashes `/` not backslashes `\`.
 
 1. Stop the server (`stop.bat`)
 2. Delete `database/labs.db`
-3. Delete all files inside `labs_files/`
+3. Delete all files inside `labs/`
 4. Run `start.bat` — re-seeds automatically
 
 ## Backup

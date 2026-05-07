@@ -5,7 +5,7 @@ from pathlib import Path
 from loguru import logger
 from database.connection import get_db
 
-LABS_FILES_DIR = Path(__file__).parent.parent / "labs_files"
+LABS_FILES_DIR = Path(__file__).parent.parent / "labs"
 
 def extract_lab_id(filename: str) -> str | None:
     """

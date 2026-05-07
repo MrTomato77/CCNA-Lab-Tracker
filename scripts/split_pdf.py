@@ -1,0 +1,109 @@
+"""One-time script: split the master CCNA Labs PDF into 51 per-lab files.
+
+Run from the project root:
+    python scripts/split_pdf.py
+
+Re-running is safe: existing per-lab files are skipped unless --force is passed.
+"""
+
+import argparse
+import re
+import sys
+from pathlib import Path
+
+from pypdf import PdfReader, PdfWriter
+
+ROOT = Path(__file__).resolve().parent.parent
+SOURCE_PDF = ROOT / "docs" / "CCNA-Network-Labs-Professional_2024_Edition_v3.1_Signed.pdf"
+OUT_DIR = ROOT / "docs"
+
+LAB_RE = re.compile(r"\bLAB[-\s]?(\d{1,2})\b", re.IGNORECASE)
+
+
+def labs_on_page(text: str) -> list[int]:
+    """Return the sorted unique lab numbers mentioned on a page."""
+    return sorted({int(m.group(1)) for m in LAB_RE.finditer(text or "")})
+
+
+def find_section_starts(reader: PdfReader) -> dict[int, int]:
+    """Map lab number -> 0-indexed page where its section starts.
+
+    Heuristic: a lab section starts on the first page that mentions exactly
+    one lab id (TOC pages mention many at once and are skipped). Once a lab
+    has been claimed, later pages mentioning it are treated as body pages
+    (they belong to that lab's section, not a new section).
+    """
+    starts: dict[int, int] = {}
+    for i, page in enumerate(reader.pages):
+        try:
+            text = page.extract_text() or ""
+        except Exception:
+            text = ""
+        labs = labs_on_page(text)
+        if len(labs) != 1:
+            continue
+        lab_num = labs[0]
+        if lab_num in starts:
+            continue
+        if not 1 <= lab_num <= 51:
+            continue
+        starts[lab_num] = i
+    return starts
+
+
+def write_section(reader: PdfReader, start: int, end_exclusive: int, dest: Path):
+    writer = PdfWriter()
+    for p in range(start, end_exclusive):
+        writer.add_page(reader.pages[p])
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    with dest.open("wb") as f:
+        writer.write(f)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--force", action="store_true", help="Overwrite existing per-lab PDFs.")
+    args = parser.parse_args()
+
+    if not SOURCE_PDF.exists():
+        print(f"[ERROR] Source PDF not found: {SOURCE_PDF}", file=sys.stderr)
+        return 1
+
+    reader = PdfReader(str(SOURCE_PDF))
+    total_pages = len(reader.pages)
+    print(f"Source: {SOURCE_PDF.name} ({total_pages} pages)")
+
+    starts = find_section_starts(reader)
+    if not starts:
+        print("[ERROR] No lab section starts detected. Heuristic may need tuning.", file=sys.stderr)
+        return 1
+
+    found_labs = sorted(starts.keys())
+    missing = [n for n in range(1, 52) if n not in starts]
+    print(f"Detected: {len(found_labs)}/51 labs")
+    if missing:
+        print(f"  Missing: {', '.join(f'LAB-{n:02d}' for n in missing)}")
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    written = skipped = 0
+    for lab_num in found_labs:
+        start = starts[lab_num]
+        # End = start of next detected lab, or end of PDF for the last one
+        next_labs = [s for n, s in starts.items() if s > start]
+        end = min(next_labs) if next_labs else total_pages
+        dest = OUT_DIR / f"LAB-{lab_num:02d}.pdf"
+        if dest.exists() and not args.force:
+            print(f"  LAB-{lab_num:02d} -> pages {start + 1}-{end} (skipped, already exists)")
+            skipped += 1
+            continue
+        write_section(reader, start, end, dest)
+        size_kb = dest.stat().st_size / 1024
+        print(f"  LAB-{lab_num:02d} -> pages {start + 1}-{end} ({end - start} pages, {size_kb:.0f} KB)")
+        written += 1
+
+    print(f"\nDone. Written: {written}, skipped: {skipped}, missing: {len(missing)}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -5,7 +5,8 @@ CREATE TABLE IF NOT EXISTS labs (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
     category    TEXT NOT NULL,
-    file_path   TEXT DEFAULT NULL
+    file_path   TEXT DEFAULT NULL,
+    docs_path   TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS progress (

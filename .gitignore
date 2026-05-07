@@ -1,14 +1,14 @@
 venv
 
+.playwright-mcp/
+
 __pycache__/
-*.pyc
+
+labs/
+docs/
 
 *.db-shm
 *.db-wal
 *.db
-
-labs_files/
-
-.playwright-mcp/
-
+*.pyc
 *.pdf

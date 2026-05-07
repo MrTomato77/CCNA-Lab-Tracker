@@ -178,6 +178,14 @@ window.labCard = function(initialLab) {
       }
     },
 
+    openDocs() {
+      if (!this.lab.docs_path) {
+        window.showToast("! No docs for this lab. Run scripts/split_pdf.py first.", 'error');
+        return;
+      }
+      window.open(`/docs/${this.lab.id}.pdf`, '_blank');
+    },
+
     async launch() {
       if (!this.lab.file_path) {
         window.showToast("! Import this lab first. Go to Import page.", 'error');

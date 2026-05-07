@@ -38,6 +38,24 @@ async def app_js(request: Request):
         description=(PUBLIC / "app.js").read_text(encoding="utf-8"),
     )
 
+DOCS_DIR = Path(__file__).parent / "docs"
+
+@app.get("/docs/:filename")
+async def lab_docs(request: Request):
+    # filename arrives as e.g. "LAB-07.pdf"; reject anything else to keep
+    # this route from doubling as a generic file-server.
+    filename = request.path_params.get("filename", "")
+    if not filename.endswith(".pdf") or "/" in filename or "\\" in filename:
+        return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
+    pdf = DOCS_DIR / filename
+    if not pdf.exists():
+        return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
+    return Response(
+        status_code=200,
+        headers={"Content-Type": "application/pdf"},
+        description=pdf.read_bytes(),
+    )
+
 # Register routers
 app.include_router(labs.router)
 app.include_router(progress.router)
@@ -52,7 +70,7 @@ app.include_router(importer.router)
 @app.startup_handler
 async def startup():
     from services.pt_launcher import PT_EXE
-    labs_dir = Path(__file__).parent / "labs_files"
+    labs_dir = Path(__file__).parent / "labs"
     labs_dir.mkdir(exist_ok=True)
     await init_db()
     # Warn (don't fail) if Packet Tracer isn't where .env says — user may
