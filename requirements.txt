@@ -1,4 +1,4 @@
-robyn==0.64.4
+robyn==0.64.2
 aiosqlite
 pydantic>=2.0
 loguru
