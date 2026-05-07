@@ -11,9 +11,9 @@
   <!-- Chart.js MUST load before Alpine (synchronous) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-  <!-- Alpine MUST be last, with defer -->
-  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
+  <!-- Load app.js BEFORE Alpine so deferLoadingAlpine is defined in time -->
   <script src="app.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
 </head>
 <body x-data="appShell()" x-init="init()">
 
@@ -22,6 +22,7 @@
     <button @click="page='dashboard'" :class="{active: page==='dashboard'}">Dashboard</button>
     <button @click="page='import'"    :class="{active: page==='import'}">Import Labs</button>
     <button @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
+    <button @click="resetAllLabs()" class="btn-reset">⟲ Reset All</button>
   </nav>
 
   <!-- DASHBOARD -->
@@ -33,7 +34,7 @@
           <span x-text="`${summary.done} / ${summary.total} Completed`" style="font-size:14px;font-weight:600"></span>
           <div class="progress-track"><div class="progress-fill" :style="`width:${summary.completion_percent}%`"></div></div>
           <span x-text="`${summary.completion_percent}%`" style="font-size:13px;color:var(--text-muted)"></span>
-          <span x-text="`⏱ ${formatTotalTime(summary.total_time_spent)}`" style="font-size:12px;color:var(--text-muted)"></span>
+          <span x-text="`⏲ ${formatTotalTime(summary.total_time_spent)}`" style="font-size:12px;color:var(--text-muted)"></span>
         </div>
         <div class="filter-tabs">
           <button @click="filterCat=''" :class="{active:filterCat===''}">All (51)</button>
@@ -46,31 +47,38 @@
           <template x-for="lab in filteredLabs" :key="lab.id">
             <div x-data="labCard(lab)" x-init="init()" :class="cardClass()">
               <div class="card-header">
-                <span class="lab-id" x-text="lab.id"></span>
+                <div>
+                  <span class="lab-id" x-text="lab.id"></span>
+                  <span class="lab-category" x-text="lab.category" style="font-size:10px;color:var(--text-muted);margin-left:8px"></span>
+                </div>
                 <span :class="badgeClass()" x-text="statusLabel()"></span>
               </div>
-              <div class="lab-name" x-text="lab.name"></div>
-              <div class="lab-category" x-text="lab.category"></div>
-              <div class="timer-section">
-                <span class="timer-display" x-text="formatTime(elapsed)"></span>
-                <div class="timer-btns">
-                  <button @click="startTimer()" x-show="!running" class="btn-icon" title="Start">▶</button>
-                  <button @click="stopTimer()"  x-show="running"  class="btn-icon btn-stop" title="Stop">⏹</button>
-                  <button @click="resetTimer()"                    class="btn-icon" title="Reset">↺</button>
+              
+              <div class="card-content">
+                <!-- Detail Column -->
+                <div class="card-detail">
+                  <div class="lab-name" x-text="lab.name"></div>
+                </div>
+                
+                <!-- Timer Column -->
+                <div class="card-timer">
+                  <div class="timer-section">
+                    <span class="timer-display" x-text="formatTime(elapsed)"></span>
+                    <div class="timer-btns">
+                      <button @click="stopTimer()"  x-show="running"  class="btn-icon btn-stop" title="Stop">■</button>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Launch Column -->
+                <div class="card-launch">
+                  <button @click="launch()" class="btn-launch"
+                    :disabled="!lab.file_path"
+                    :title="lab.file_path ? 'Open in Packet Tracer' : 'Import this lab first'"
+                    x-text="lab.file_path ? '▶ Launch' : '! Not Imported'">
+                  </button>
                 </div>
               </div>
-              <div class="timer-meta">Total: <span x-text="formatTime(lab.time_spent)"></span></div>
-              <select x-model="lab.status" @change="updateStatus()" class="status-select">
-                <option value="not_started">Not Started</option>
-                <option value="in_progress">In Progress</option>
-                <option value="done">Done</option>
-              </select>
-              <button @click="launch()" class="btn-launch"
-                :disabled="!lab.file_path"
-                :title="lab.file_path ? 'Open in Packet Tracer' : 'Import this lab first'"
-                x-text="lab.file_path ? '▶ Launch in Packet Tracer' : '⚠ Not Imported — Go to Import'">
-              </button>
-              <div x-show="toast" x-text="toastMsg" class="toast" x-transition></div>
             </div>
           </template>
         </div>
@@ -110,7 +118,7 @@
         <h3 x-text="`Results — ${importedCount} / ${results.length} imported`"></h3>
         <template x-for="r in results" :key="r.file">
           <div class="result-row" :class="`result--${r.status}`">
-            <span x-text="r.status==='imported'?'✅':r.status==='skipped'?'⚠️':'❌'"></span>
+            <span x-text="r.status==='imported'?'+':r.status==='skipped'?'!':'×'"></span>
             <span x-text="r.file"></span>
             <span class="result-detail" x-text="r.lab_id ?? r.reason"></span>
           </div>
@@ -125,6 +133,7 @@
       <template x-for="lab in status.missing" :key="lab.id">
         <div class="missing-row">
           <span class="lab-id" x-text="lab.id"></span>
+          <span class="lab-category" x-text="lab.category" style="font-size:10px;color:var(--text-muted);margin-left:8px"></span>
           <span x-text="lab.name" style="flex:1;font-size:12px"></span>
           <span class="badge badge--not-imported">Missing</span>
         </div>

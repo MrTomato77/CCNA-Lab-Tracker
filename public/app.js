@@ -16,7 +16,7 @@ document.addEventListener("alpine:init", () => {
 });
 
 // ── App Shell ─────────────────────────────────────────────────────────────
-function appShell() {
+window.appShell = function() {
   return {
     page: "dashboard",
     loading: true,
@@ -29,7 +29,6 @@ function appShell() {
       "Management", "Security & Advanced"
     ],
 
-    // Convenience getter so existing `x-text="summary.done"` bindings still work
     get summary() { return this.$store.app.summary; },
 
     async init() {
@@ -50,6 +49,25 @@ function appShell() {
       }
     },
 
+    async resetAllLabs() {
+      if (!confirm("! This will reset ALL labs to Not Started and clear all timer data. Are you sure?")) {
+        return;
+      }
+      try {
+        const res = await fetch("/api/labs/reset", { method: "POST" });
+        const json = await res.json();
+        if (json.success) {
+          await this.fetchLabs();
+          window.showToast("+ All labs have been reset successfully!", 'success');
+        } else {
+          window.showToast(`× Error: ${json.error}`, 'error');
+        }
+      } catch (e) {
+        window.showToast("× Network error while resetting labs", 'error');
+        console.error("Reset failed:", e);
+      }
+    },
+
     get filteredLabs() {
       const cat = this.filterCat;
       const q   = this.search.toLowerCase();
@@ -67,26 +85,23 @@ function appShell() {
 }
 
 // ── Lab Card ──────────────────────────────────────────────────────────────
-function labCard(initialLab) {
+window.labCard = function(initialLab) {
   return {
     lab: { ...initialLab },
     running: false,
     elapsed: 0,
     sessionStart: null,
     interval: null,
-    toast: false,
-    toastMsg: "",
 
     init() {
-      // Resume an open timer session if one exists. The open session's
-      // started_at is delivered inline with GET /api/labs (no per-card
-      // fetch) via the open_session_started_at column.
-      if (!this.lab.open_session_started_at) return;
-      const started = new Date(this.lab.open_session_started_at);
-      const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
+      // Resume an open timer session if one exists. open_session_started_at is
+      // delivered inline with GET /api/labs via correlated subquery.
       // 8-hour cap: if resumed elapsed is implausibly large (laptop sleep,
       // clock drift, zombie row that slipped past startup cleanup), treat
       // the session as abandoned rather than crediting bogus time.
+      if (!this.lab.open_session_started_at) return;
+      const started = new Date(this.lab.open_session_started_at);
+      const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
       const EIGHT_HOURS = 8 * 3600;
       if (elapsed < 0 || elapsed > EIGHT_HOURS) return;
       this.sessionStart = started;
@@ -106,8 +121,6 @@ function labCard(initialLab) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ started_at: this.sessionStart.toISOString(), duration: 0 })
       });
-      // Mirror the server state locally so a page refresh right now resumes
-      // via the 8-hour-capped logic in init(), not a stale list payload.
       this.lab.open_session_started_at = this.sessionStart.toISOString();
       this.interval = setInterval(() => this.elapsed++, 1000);
     },
@@ -126,10 +139,15 @@ function labCard(initialLab) {
         const json = await res.json();
         if (json.success) {
           this.lab.time_spent = json.data.time_spent;
-          // Keep the dashboard progress bar / total-time counter live
-          await Alpine.store("app").refreshSummary();
+          // Auto-mark done after stop (per user-confirmed launch flow)
+          this.lab.status = 'done';
+          await this.updateStatus('done');
+          window.showToast("+ Time saved & marked done", 'success');
         }
-      } catch (e) { console.error("Timer save failed:", e); }
+      } catch (e) {
+        console.error("Timer save failed:", e);
+        window.showToast("× Failed to save time", 'error');
+      }
       this.elapsed = 0;
       this.sessionStart = null;
       this.lab.open_session_started_at = null;
@@ -142,36 +160,43 @@ function labCard(initialLab) {
       this.sessionStart = null;
     },
 
-    async updateStatus() {
+    async updateStatus(newStatus = null) {
       try {
+        const status = newStatus || this.lab.status;
         await fetch(`/api/labs/${this.lab.id}/status`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: this.lab.status })
+          body: JSON.stringify({ status: status })
         });
-        // Summary reflects done/in_progress/not_started counts — refresh
-        // so the progress bar updates the moment the user picks a status.
+        if (newStatus) {
+          this.lab.status = newStatus;
+        }
         await Alpine.store("app").refreshSummary();
-      } catch (e) { console.error("Status update failed:", e); }
+      } catch (e) {
+        console.error("Status update failed:", e);
+        window.showToast("× Failed to update status", 'error');
+      }
     },
 
     async launch() {
       if (!this.lab.file_path) {
-        this.showToast("⚠ Import this lab first. Go to Import page.");
+        window.showToast("! Import this lab first. Go to Import page.", 'error');
         return;
       }
       try {
         const res  = await fetch(`/api/labs/${this.lab.id}/open`, { method: "POST" });
         const json = await res.json();
-        this.showToast(json.success ? "✓ Opening in Packet Tracer..." : `✗ ${json.error}`);
-      } catch (e) { this.showToast("✗ Network error"); }
-    },
-
-    showToast(msg) {
-      this.toastMsg = msg;
-      this.toast = true;
-      clearTimeout(this._toastTimer);
-      this._toastTimer = setTimeout(() => this.toast = false, 3500);
+        if (json.success) {
+          window.showToast("+ Opening in Packet Tracer...", 'success');
+          if (!this.running) {
+            this.startTimer();
+          }
+        } else {
+          window.showToast(`× ${json.error}`, 'error');
+        }
+      } catch (e) {
+        window.showToast("× Network error", 'error');
+      }
     },
 
     formatTime(s = 0) {
@@ -193,7 +218,7 @@ function labCard(initialLab) {
 }
 
 // ── Import Page ────────────────────────────────────────────────────────────
-function importPage() {
+window.importPage = function() {
   return {
     dragging: false,
     folderPath: "",
@@ -259,14 +284,12 @@ function importPage() {
 }
 
 // ── Stats Page ─────────────────────────────────────────────────────────────
-function statsPage() {
+window.statsPage = function() {
   return {
     loading: true,
     byCategory: [],
     chart: null,
 
-    // Read summary from the shared store — gets live updates when the user
-    // changes status or stops a timer on the dashboard without leaving the page.
     get summary() { return this.$store.app.summary; },
 
     async load() {
@@ -282,8 +305,6 @@ function statsPage() {
         this.loading    = false;
         // x-if unmounts the chart container while loading=true, so we must
         // wait for the next DOM tick before grabbing the canvas element.
-        // $nextTick is the correct tool; the setTimeout(50) hack in v4.1
-        // was a race disguised as a fix.
         await this.$nextTick();
         this.renderChart(slowest);
       } catch (e) {
@@ -321,3 +342,42 @@ function statsPage() {
     }
   }
 }
+
+// ── Toast Service ─────────────────────────────────────────────────────
+window.showToast = function(message, type = 'info', duration = 1000) {
+  const toast = document.createElement('div');
+  toast.className = `toast toast--${type}`;
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 12px 20px;
+    background: ${type === 'error' ? '#dc2626' : type === 'success' ? '#059669' : '#0891b2'};
+    color: white;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 1000;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    max-width: 400px;
+    text-align: center;
+  `;
+
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50%) translateY(-20px)';
+    setTimeout(() => document.body.removeChild(toast), 300);
+  }, duration);
+};
+
+// Disable Alpine auto-start and start it manually (deferLoadingAlpine helper)
+window.deferLoadingAlpine = function (callback) {
+  window.addEventListener('DOMContentLoaded', () => {
+    callback();
+  });
+};
