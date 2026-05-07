@@ -61,7 +61,7 @@ nav button.active { border-color: var(--accent); color: var(--accent); backgroun
 .card-content { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: start; }
 .card-detail { flex: 1; }
 .card-timer { display: flex; flex-direction: column; align-items: center; min-width: 120px; }
-.card-launch { display: flex; flex-direction: column; align-items: center; min-width: 100px; }
+.card-launch { display: flex; flex-direction: row; align-items: center; gap: 6px; min-width: auto; }
 .lab-card--in_progress { border-left-color: var(--progress); background: var(--progress-bg); }
 .lab-card--done        { border-left-color: var(--done);     background: var(--done-bg); }
 .lab-card--no-file     { opacity: 0.7; }
@@ -96,7 +96,7 @@ nav button.active { border-color: var(--accent); color: var(--accent); backgroun
 /* ── Launch button ──────────────────────────────────── */
 .btn-launch { padding: 4px 8px; border: 1px solid var(--accent); border-radius: var(--radius);
               background: transparent; color: var(--accent); cursor: pointer;
-              font-size: 11px; font-weight: 600; width: 100%; }
+              font-size: 11px; font-weight: 600; flex: 1; }
 .btn-launch:hover    { background: var(--accent); color: #fff; }
 .btn-launch:disabled { border-color: var(--border); color: var(--text-muted); cursor: not-allowed; }
 
@@ -105,12 +105,15 @@ nav button.active { border-color: var(--accent); color: var(--accent); backgroun
              background: transparent; cursor: pointer; font-size: 13px; color: #ef4444; }
 .btn-reset:hover { background: #ef4444; color: #fff; border-color: #ef4444; }
 
-/* ── Docs button ─────────────────────────────────────── */
-.btn-docs { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius);
+/* ── Docs button (small icon, secondary action) ─ */
+.btn-docs { padding: 4px 6px;
+            border: 1px solid var(--border); border-radius: var(--radius);
             background: transparent; color: var(--text-muted); cursor: pointer;
-            font-size: 11px; font-weight: 500; width: 100%; margin-top: 4px; }
-.btn-docs:hover    { border-color: var(--text); color: var(--text); }
-.btn-docs:disabled { opacity: 0.5; cursor: not-allowed; }
+            font-size: 12px; font-weight: 600; width: auto; flex-shrink: 0;
+            box-sizing: border-box; font-family: var(--font-body); }
+.btn-docs:hover           { border-color: var(--accent); color: var(--accent); }
+.btn-docs:disabled        { opacity: 0.4; cursor: not-allowed; }
+.btn-docs:disabled:hover  { border-color: var(--border); color: var(--text-muted); }
 
 /* ── Toast ──────────────────────────────────────────── */
 .toast { font-size: 11px; padding: 6px 10px; background: #111; color: #fff;
