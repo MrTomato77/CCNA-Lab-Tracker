@@ -2,9 +2,9 @@
 title CCNA Lab Tracker
 color 0F
 echo.
-echo  ====================================
-echo    CCNA Lab Tracker  v4.2
-echo  ====================================
+echo  =====================================================
+echo    CCNA Lab Tracker v4.2
+echo  =====================================================
 echo.
 
 :: Check port 8080 not already in use
@@ -37,8 +37,6 @@ if errorlevel 1 (
     pause & exit /b 1
 )
 
-echo  [INFO] Server starting at http://localhost:8080
-echo  [INFO] Press Ctrl+C to stop.
 echo.
 
 :: Open browser after 2s delay
