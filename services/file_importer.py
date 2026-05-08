@@ -7,6 +7,8 @@ from database.connection import get_db
 
 LABS_FILES_DIR = Path(__file__).parent.parent / "labs"
 
+_MAX_LAB_NUMBER = 51   # bump if LAB_DEFINITIONS in database/seed.py grows
+
 def extract_lab_id(filename: str) -> str | None:
     """
     Extract LAB-XX from irregular filenames:
@@ -14,11 +16,18 @@ def extract_lab_id(filename: str) -> str | None:
       'LAB-21-IPv4 Static and Default Route.pka'  (extra dash)
       'LAB-49 DHCP Snooing.pka'                   (typo — still matches)
     Returns 'LAB-07' (zero-padded) or None.
+
+    Numbers outside 1..51 (the seeded range) return None so a junk file
+    like 'LAB-99.pka' fails the import with a clear "skipped" reason
+    instead of slipping through and orphaning a row in `labs`.
     """
     match = re.search(r'\bLAB[-\s]?(\d{1,2})\b', filename, re.IGNORECASE)
-    if match:
-        return f"LAB-{int(match.group(1)):02d}"
-    return None
+    if not match:
+        return None
+    n = int(match.group(1))
+    if not (1 <= n <= _MAX_LAB_NUMBER):
+        return None
+    return f"LAB-{n:02d}"
 
 def dest_path(lab_id: str) -> Path:
     return LABS_FILES_DIR / f"{lab_id}.pka"

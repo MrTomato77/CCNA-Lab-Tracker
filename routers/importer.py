@@ -1,4 +1,5 @@
 from robyn import Request, SubRouter
+from core.responses import err
 from services import lab_service
 from services.file_importer import import_from_folder, import_from_bytes
 
@@ -8,7 +9,7 @@ router = SubRouter(__name__, prefix="/api/import")
 async def upload_files(request: Request):
     files_raw = request.files
     if not files_raw:
-        return {"success": False, "error": "No files received.", "code": "NO_FILES"}, 400
+        return err({"success": False, "error": "No files received.", "code": "NO_FILES"}, 400)
 
     results = []
     # Auto-detect Robyn multipart version
@@ -30,11 +31,11 @@ async def scan_folder(request: Request):
     body = request.json()
     folder_path = (body.get("folder_path") or "").strip()
     if not folder_path:
-        return {"success": False, "error": "folder_path is required.", "code": "VALIDATION_ERROR"}, 422
+        return err({"success": False, "error": "folder_path is required.", "code": "VALIDATION_ERROR"}, 422)
     try:
         results = await import_from_folder(folder_path)
     except ValueError as e:
-        return {"success": False, "error": str(e), "code": "FOLDER_NOT_FOUND"}, 404
+        return err({"success": False, "error": str(e), "code": "FOLDER_NOT_FOUND"}, 404)
     imported = [r for r in results if r["status"] == "imported"]
     return {"success": True, "data": {"results": results, "imported_count": len(imported), "total_count": len(results)}}
 

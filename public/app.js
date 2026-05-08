@@ -394,11 +394,9 @@ window.statsPage = function() {
         // wait for the next DOM tick before grabbing the canvas element.
         await this.$nextTick();
         this.renderChart(slowest);
-        // Re-paint chart when theme toggles (colors come from CSS vars at
-        // render time, so a destroy-and-recreate gives us fresh tokens).
-        window.addEventListener("theme-changed", () => {
-          if (this._slowest) this.renderChart(this._slowest);
-        });
+        // Bind once at module scope — palette tokens come from CSS vars at
+        // render time, so a destroy-and-recreate gives us fresh colours.
+        bindStatsThemeListener(() => this);
       } catch (e) {
         console.error("Stats load failed:", e);
         this.loading = false;
@@ -452,6 +450,24 @@ window.statsPage = function() {
     formatTime(s = 0)     { return formatTime(s, 'compact'); },
     formatTimeRich(s = 0) { return formatTime(s, 'rich');    }
   }
+}
+
+// ── Stats theme-listener (one-time bind) ─────────────────────────────
+// statsPage.load() runs every time the user navigates to /stats. Binding
+// the `theme-changed` listener inline there leaked one listener per visit
+// — five visits = five chart redraws on a single theme toggle. Hoist the
+// registration to module scope behind a guard so it fires exactly once,
+// then poll back to whatever statsPage instance is currently mounted.
+let _statsRef = null;
+let _statsThemeBound = false;
+function bindStatsThemeListener(getCurrent) {
+  _statsRef = getCurrent;
+  if (_statsThemeBound) return;
+  _statsThemeBound = true;
+  window.addEventListener('theme-changed', () => {
+    const cur = _statsRef && _statsRef();
+    if (cur && cur._slowest) cur.renderChart(cur._slowest);
+  });
 }
 
 // ── Toast Service ─────────────────────────────────────────────────────
