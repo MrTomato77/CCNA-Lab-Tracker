@@ -13,6 +13,19 @@ document.addEventListener("alpine:init", () => {
       } catch (e) { console.error("Summary refresh failed:", e); }
     }
   });
+
+  Alpine.store("modal", {
+    open: false, title: "", message: "", danger: false, resolve: null,
+    show(message, title = "", danger = false) {
+      return new Promise(resolve => {
+        this.title = title; this.message = message;
+        this.danger = danger; this.resolve = resolve;
+        this.open = true;
+      });
+    },
+    ok()     { if (this.resolve) this.resolve(true);  this.open = false; },
+    cancel() { if (this.resolve) this.resolve(false); this.open = false; }
+  });
 });
 
 // ── App Shell ─────────────────────────────────────────────────────────────
@@ -23,6 +36,8 @@ window.appShell = function() {
     labs: [],
     filterCat: "",
     hideStatus: "",
+    statusOpen: false,
+    theme: document.documentElement.getAttribute("data-theme") || "light",
     categories: [
       "CLI & Basic", "Switching & VLAN", "Wireless",
       "Inter-VLAN & Routing", "HSRP & ACL", "NAT & DHCP",
@@ -34,6 +49,16 @@ window.appShell = function() {
     async init() {
       await this.fetchLabs();
       window.addEventListener("refresh-labs", () => this.fetchLabs());
+    },
+
+    toggleTheme() {
+      this.theme = this.theme === "light" ? "dark" : "light";
+      document.documentElement.setAttribute("data-theme", this.theme);
+      try { localStorage.setItem("theme", this.theme); } catch (e) { /* ignore */ }
+      // Re-render chart with new theme colors if present
+      if (this.page === "stats") {
+        window.dispatchEvent(new CustomEvent("theme-changed"));
+      }
     },
 
     async fetchLabs() {
@@ -50,9 +75,11 @@ window.appShell = function() {
     },
 
     async resetAllLabs() {
-      if (!confirm("! This will reset ALL labs to Not Started and clear all timer data. Are you sure?")) {
-        return;
-      }
+      const ok = await Alpine.store("modal").show(
+        "This will reset ALL labs to Not Started and clear all timer data.",
+        "Reset All Labs", true
+      );
+      if (!ok) return;
       try {
         const res = await fetch("/api/labs/reset", { method: "POST" });
         const json = await res.json();
@@ -164,7 +191,10 @@ window.labCard = function(initialLab) {
     },
 
     async resetLab() {
-      if (!confirm(`Reset progress and time for ${this.lab.id}?`)) return;
+      const ok = await Alpine.store("modal").show(
+        `Reset progress and time for ${this.lab.id}?`, "Reset Lab"
+      );
+      if (!ok) return;
       try {
         const res = await fetch(`/api/labs/reset-single/${this.lab.id}`, { method: "POST" });
         const json = await res.json();
@@ -334,11 +364,17 @@ window.statsPage = function() {
         ]);
         this.byCategory = (await catRes.json()).data;
         const slowest   = (await slowRes.json()).data;
+        this._slowest   = slowest;
         this.loading    = false;
         // x-if unmounts the chart container while loading=true, so we must
         // wait for the next DOM tick before grabbing the canvas element.
         await this.$nextTick();
         this.renderChart(slowest);
+        // Re-paint chart when theme toggles (colors come from CSS vars at
+        // render time, so a destroy-and-recreate gives us fresh tokens).
+        window.addEventListener("theme-changed", () => {
+          if (this._slowest) this.renderChart(this._slowest);
+        });
       } catch (e) {
         console.error("Stats load failed:", e);
         this.loading = false;
@@ -349,21 +385,42 @@ window.statsPage = function() {
       const el = document.getElementById("timeChart");
       if (!el) return;
       if (this.chart) this.chart.destroy();
+      // Pull palette from current CSS variables so dark/light themes stay
+      // consistent without hard-coding hex codes here.
+      const css = getComputedStyle(document.documentElement);
+      const accent = css.getPropertyValue("--accent").trim() || "#1d8fc7";
+      const accentRgb = css.getPropertyValue("--accent-rgb").trim() || "29, 143, 199";
+      const border = css.getPropertyValue("--border").trim() || "#e8eaf2";
+      const text3  = css.getPropertyValue("--text-3").trim() || "#7c8294";
       this.chart = new Chart(el.getContext("2d"), {
         type: "bar",
         data: {
           labels: data.map(d => d.id),
           datasets: [{
-            label: "Time Spent (minutes)",
+            label: "minutes",
             data: data.map(d => Math.round(d.time_spent / 60)),
-            backgroundColor: "#049fd4",
-            borderRadius: 4
+            backgroundColor: `rgba(${accentRgb}, 0.20)`,
+            borderColor:     accent,
+            borderWidth:     1,
+            borderRadius:    4
           }]
         },
         options: {
           responsive: true,
           plugins: { legend: { display: false } },
-          scales: { y: { beginAtZero: true, ticks: { stepSize: 10 } } }
+          scales: {
+            x: {
+              grid:   { display: false, drawBorder: false },
+              border: { color: border },
+              ticks:  { color: text3, font: { family: "Outfit", size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid:   { color: border, drawBorder: false, lineWidth: 1 },
+              border: { display: false },
+              ticks:  { stepSize: 10, color: text3, font: { family: "Outfit", size: 11 } }
+            }
+          }
         }
       });
     },
@@ -371,39 +428,27 @@ window.statsPage = function() {
     formatTime(s = 0) {
       const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
       return h > 0 ? `${h}h ${m}m` : `${m}m`;
+    },
+
+    // Editorial-styled time: "4ʰ 32ᵐ" with superscript markup for stat blocks
+    formatTimeRich(s = 0) {
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+      if (h > 0) return `${h}<sup>h</sup> ${m}<sup>m</sup>`;
+      return `${m}<sup>m</sup>`;
     }
   }
 }
 
 // ── Toast Service ─────────────────────────────────────────────────────
-window.showToast = function(message, type = 'info', duration = 1000) {
+window.showToast = function(message, type = 'info', duration = 1800) {
   const toast = document.createElement('div');
   toast.className = `toast toast--${type}`;
   toast.textContent = message;
-  toast.style.cssText = `
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    padding: 12px 20px;
-    background: ${type === 'error' ? '#dc2626' : type === 'success' ? '#059669' : '#0891b2'};
-    color: white;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    z-index: 1000;
-    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    transition: all 0.3s ease;
-    max-width: 400px;
-    text-align: center;
-  `;
-
   document.body.appendChild(toast);
 
   setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateX(-50%) translateY(-20px)';
-    setTimeout(() => document.body.removeChild(toast), 300);
+    toast.classList.add('toast--leaving');
+    setTimeout(() => toast.remove(), 220);
   }, duration);
 };
 

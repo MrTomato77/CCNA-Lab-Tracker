@@ -1,94 +1,133 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CCNA Lab Tracker</title>
   <link rel="icon" href="data:,">
+  <!-- Pre-paint theme init: avoid flash of wrong theme -->
+  <script>
+    (function() {
+      try {
+        var saved = localStorage.getItem("theme");
+        var systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var theme = saved || (systemDark ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      } catch (e) { /* localStorage may be blocked; default stays */ }
+    })();
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <!-- Chart.js MUST load before Alpine (synchronous) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
   <!-- Load app.js BEFORE Alpine so deferLoadingAlpine is defined in time -->
   <script src="app.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
 </head>
 <body x-data="appShell()" x-init="init()">
 
-  <nav>
-    <span class="app-title">CCNA Lab Tracker</span>
-    <button @click="page='dashboard'" :class="{active: page==='dashboard'}">Dashboard</button>
-    <button @click="page='import'"    :class="{active: page==='import'}">Import Labs</button>
-    <button @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
-    <button @click="resetAllLabs()" class="btn-reset">⟲ Reset All</button>
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <div class="brand">
+        <span class="brand-mark">◆</span>
+        <span class="brand-name">CCNA Lab Tracker</span>
+      </div>
+      <div class="nav-tabs">
+        <button class="nav-tab" @click="page='dashboard'" :class="{active: page==='dashboard'}">Dashboard</button>
+        <button class="nav-tab" @click="page='import'"    :class="{active: page==='import'}">Import</button>
+        <button class="nav-tab" @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
+      </div>
+      <div class="nav-utility">
+        <button class="theme-toggle" @click="toggleTheme()"
+                :title="`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`"
+                x-text="theme === 'light' ? '☾' : '☀'"></button>
+        <button class="nav-reset" @click="resetAllLabs()">↻ Reset all</button>
+      </div>
+    </div>
   </nav>
 
   <!-- DASHBOARD -->
   <div class="page" x-show="page==='dashboard'">
-    <div x-show="loading" class="loading">Loading labs...</div>
+    <div x-show="loading" class="loading"><span class="spinner"></span> Loading…</div>
     <template x-if="!loading">
       <div>
-        <div class="summary-bar">
-          <span x-text="`${summary.done} / ${summary.total} Completed`" style="font-size:14px;font-weight:600"></span>
-          <div class="progress-track"><div class="progress-fill" :style="`width:${summary.completion_percent}%`"></div></div>
-          <span x-text="`${summary.completion_percent}%`" style="font-size:13px;color:var(--text-muted)"></span>
-          <span x-text="`⏲ ${formatTotalTime(summary.total_time_spent)}`" style="font-size:12px;color:var(--text-muted)"></span>
-        </div>
-        <div class="filter-row">
-          <div class="filter-tabs">
-            <button @click="filterCat=''" :class="{active:filterCat===''}">All (51)</button>
-            <template x-for="cat in categories" :key="cat">
-              <button @click="filterCat=cat" :class="{active:filterCat===cat}" x-text="cat"></button>
-            </template>
-          </div>
-          <select x-model="hideStatus" class="status-filter">
-            <option value="">Show All</option>
-            <option value="done">Hide Done</option>
-            <option value="undone">Hide Undone</option>
-          </select>
-        </div>
-        <div class="cards-grid">
-          <template x-for="lab in filteredLabs" :key="lab.id">
-            <div x-data="labCard(lab)" x-init="init()" :class="cardClass()">
-              <button @click="resetLab()" class="btn-reset-single" title="Reset this lab" x-show="lab.status === 'done'">⟳</button>
-              <div class="card-header">
-                <div>
-                  <span class="lab-id" x-text="lab.id"></span>
-                  <span class="lab-category" x-text="lab.category" style="font-size:10px;color:var(--text-muted);margin-left:8px"></span>
-                </div>
-              </div>
-              
-              <div class="card-content">
-                <!-- Detail Column -->
-                <div class="card-detail">
-                  <div class="lab-name" x-text="lab.name"></div>
-                </div>
-                
-                <!-- Timer Column -->
-                <div class="card-timer">
-                  <div class="timer-section">
-                    <span class="timer-display" x-text="formatTime(running ? elapsed : lab.time_spent)"></span>
-                  </div>
-                </div>
-                
-                <!-- Launch Column -->
-                <div class="card-launch">
-                  <button @click="launch()" class="btn-launch"
-                    :class="{'btn-finish': running, 'btn-done': lab.status === 'done' && !running}"
-                    :disabled="!lab.file_path || (lab.status === 'done' && !running)"
-                    :title="!lab.file_path ? 'Import this lab first' : (running ? 'Finish lab' : (lab.status === 'done' ? 'Lab completed' : 'Open in Packet Tracer'))"
-                    x-text="running ? '■ Finish' : (lab.status === 'done' ? '✓ Done' : '▶ Launch')">
-                  </button>
-                  <button @click="openDocs()" class="btn-docs"
-                    :disabled="!lab.docs_path"
-                    :title="lab.docs_path ? 'Open lab documentation' : 'Docs not generated yet — run scripts/split_pdf.py'">
-                    ⓘ
-                  </button>
-                </div>
-              </div>
+        <!-- Hero -->
+        <header class="hero">
+          <div class="hero-left">
+            <div class="hero-stat">
+              <span x-text="String(summary.done).padStart(2,'0')"></span><span class="hero-slash"> / </span><span class="hero-total" x-text="summary.total"></span>
             </div>
+            <div class="hero-rule"></div>
+            <div class="hero-label">Completed</div>
+          </div>
+          <div class="hero-right">
+            <div class="hero-percent" x-text="`${summary.completion_percent}% complete`"></div>
+            <div class="hero-elapsed">⏱ <span x-text="formatTotalTime(summary.total_time_spent) + ' elapsed'"></span></div>
+          </div>
+          <div class="progress-track"><div class="progress-fill" :style="`width:${summary.completion_percent}%`"></div></div>
+        </header>
+
+        <!-- Filter chips -->
+        <div class="filter-strip">
+          <div class="status-select">
+            <button class="status-filter" @click="statusOpen = !statusOpen" @click.outside="statusOpen = false">
+              <span x-text="{ '': 'All status', done: 'Hide done', undone: 'Hide not done' }[hideStatus]"></span>
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="status-dropdown" x-show="statusOpen" x-cloak>
+              <button class="status-option" :class="{ active: hideStatus === '' }"
+                @click="hideStatus = ''; statusOpen = false">All status</button>
+              <button class="status-option" :class="{ active: hideStatus === 'done' }"
+                @click="hideStatus = 'done'; statusOpen = false">Hide done</button>
+              <button class="status-option" :class="{ active: hideStatus === 'undone' }"
+                @click="hideStatus = 'undone'; statusOpen = false">Hide not done</button>
+            </div>
+          </div>
+          <button class="filter-chip" @click="filterCat=''" :class="{active:filterCat===''}">All</button>
+          <template x-for="cat in categories" :key="cat">
+            <button class="filter-chip" @click="filterCat=cat" :class="{active:filterCat===cat}" x-text="cat"></button>
+          </template>
+        </div>
+
+        <!-- Cards -->
+        <div class="cards-grid">
+          <template x-for="(lab, idx) in filteredLabs" :key="lab.id">
+            <article x-data="labCard(lab)" x-init="init()" :class="cardClass()">
+              <!-- Col 1: identity -->
+              <div class="lab-identity">
+                <div class="lab-badge" x-text="String(lab.id.replace('LAB-','')).padStart(2,'0')"></div>
+                <div class="lab-content">
+                  <div class="lab-name" x-text="lab.name"></div>
+                  <div class="lab-category" x-text="lab.category"></div>
+                </div>
+              </div>
+              <!-- Col 2: reset (left) + timer (right), reset only when done -->
+              <div class="lab-col-timer">
+                <button class="btn-card-reset" @click="resetLab()" title="Reset this lab"
+                  x-show="lab.status === 'done'">↻</button>
+                <div class="lab-timer" x-text="formatTime(elapsed || lab.time_spent || 0)"></div>
+              </div>
+              <!-- Col 3: action buttons -->
+              <div class="lab-col-actions">
+                <button class="btn-action"
+                  :class="running ? 'btn-action--stop' : lab.status === 'done' ? 'btn-action--done' : 'btn-action--launch'"
+                  :disabled="!running && !lab.file_path"
+                  :title="running ? 'Stop timer' : lab.file_path ? 'Open in Packet Tracer' : 'Import this lab first'"
+                  @click="running ? stopTimer() : launch()"
+                  x-text="running ? '■ Stop' : lab.status === 'done' ? '✓ Done' : lab.file_path ? 'Launch →' : '— —'">
+                </button>
+                <button class="btn-docs"
+                  @click="openDocs()"
+                  :disabled="!lab.docs_path"
+                  :title="lab.docs_path ? 'Open lab documentation' : 'Docs not generated yet — run scripts/split_pdf.py'">
+                  Docs ›
+                </button>
+              </div>
+            </article>
           </template>
         </div>
       </div>
@@ -97,85 +136,148 @@
 
   <!-- IMPORT PAGE -->
   <div class="page" x-show="page==='import'" x-data="importPage()" x-init="loadStatus()">
-    <h2 style="font-size:18px;margin-bottom:20px">Import Lab Files</h2>
-    <div class="import-section">
-      <h3>Method 1 — Upload Files (drag & drop or browse)</h3>
-      <div class="dropzone"
-        @dragover.prevent="dragging=true"
-        @dragleave.prevent="dragging=false"
-        @drop.prevent="handleDrop($event)"
-        :class="{dragging}">
-        <p>Drag & drop .pka files here</p>
-        <p>or</p>
-        <input type="file" id="fileInput" multiple accept=".pka" @change="handleFileInput($event)">
-        <label for="fileInput" class="btn-upload">Browse Files</label>
+    <header class="page-header">
+      <h1 class="page-title">Import.</h1>
+      <p class="page-subtitle">Bring labs into the tracker</p>
+    </header>
+
+    <div class="timeline">
+      <h2 class="section-head">Method 1 — Upload</h2>
+      <div class="section-body">
+        <div class="dropzone"
+          @dragover.prevent="dragging=true"
+          @dragleave.prevent="dragging=false"
+          @drop.prevent="handleDrop($event)"
+          :class="{dragging}">
+          <p class="dropzone-primary">Drag &amp; drop <code>.pka</code> files here</p>
+          <p class="dropzone-sep">— or —</p>
+          <input type="file" id="fileInput" multiple accept=".pka" @change="handleFileInput($event)">
+          <label for="fileInput" class="btn-primary btn-primary--ghost">Browse Files</label>
+        </div>
       </div>
-    </div>
-    <div class="import-section">
-      <h3>Method 2 — Scan Folder</h3>
-      <div class="folder-input-row">
-        <input type="text" x-model="folderPath" class="folder-input"
-               placeholder="e.g. D:\CCNA Network Labs Professional\Labs">
-        <button @click="scanFolder()" :disabled="scanning" class="btn-scan">
-          <span x-show="!scanning">Scan Folder</span>
-          <span x-show="scanning">Scanning...</span>
-        </button>
+
+      <h2 class="section-head">Method 2 — Scan Folder</h2>
+      <div class="section-body">
+        <div class="folder-input-row">
+          <input type="text" x-model="folderPath" class="folder-input"
+                 placeholder="e.g. D:\CCNA Network Labs Professional\Labs">
+          <button @click="scanFolder()" :disabled="scanning" class="btn-primary">
+            <span x-show="!scanning">Scan</span>
+            <span x-show="scanning">Scanning…</span>
+          </button>
+        </div>
       </div>
-    </div>
-    <template x-if="results.length > 0">
-      <div class="import-results">
-        <h3 x-text="`Results — ${importedCount} / ${results.length} imported`"></h3>
-        <template x-for="r in results" :key="r.file">
-          <div class="result-row" :class="`result--${r.status}`">
-            <span x-text="r.status==='imported'?'+':r.status==='skipped'?'!':'×'"></span>
-            <span x-text="r.file"></span>
-            <span class="result-detail" x-text="r.lab_id ?? r.reason"></span>
+
+      <template x-if="results.length > 0">
+        <div>
+          <h2 class="section-head" x-text="`Results — ${importedCount} of ${results.length} imported`"></h2>
+          <div class="section-body">
+            <div class="result-list">
+              <template x-for="r in results" :key="r.file">
+                <div class="result-row" :class="`result--${r.status}`">
+                  <span class="result-glyph" x-text="r.status==='imported'?'✓':r.status==='skipped'?'!':'×'"></span>
+                  <span class="result-file" x-text="r.file"></span>
+                  <span class="result-detail" x-text="r.lab_id ?? r.reason"></span>
+                </div>
+              </template>
+              <button @click="window.dispatchEvent(new CustomEvent('refresh-labs')); page='dashboard'" class="btn-primary" style="margin-top:16px">
+                Go to Dashboard
+              </button>
+            </div>
           </div>
-        </template>
-        <button @click="window.dispatchEvent(new CustomEvent('refresh-labs')); page='dashboard'" class="btn-primary">
-          Go to Dashboard
-        </button>
-      </div>
-    </template>
-    <div class="import-section" style="margin-top:20px">
-      <h3 x-text="`Current Status — ${status.imported_count} / ${status.total} imported`"></h3>
-      <template x-for="lab in status.missing" :key="lab.id">
-        <div class="missing-row">
-          <span class="lab-id" x-text="lab.id"></span>
-          <span class="lab-category" x-text="lab.category" style="font-size:10px;color:var(--text-muted);margin-left:8px"></span>
-          <span x-text="lab.name" style="flex:1;font-size:12px"></span>
-          <span class="badge badge--not-imported">Missing</span>
         </div>
       </template>
+
+      <h2 class="section-head" x-text="`Status — ${status.imported_count} of ${status.total} imported`"></h2>
+      <div class="section-body">
+        <template x-if="status.missing.length === 0">
+          <p class="empty-state">All labs imported. Nothing missing.</p>
+        </template>
+        <div class="missing-list">
+          <template x-for="lab in status.missing" :key="lab.id">
+            <div class="missing-row">
+              <span class="missing-id" x-text="lab.id"></span>
+              <span class="missing-cat" x-text="lab.category"></span>
+              <span class="missing-name" x-text="lab.name"></span>
+              <span class="status-pill status-pill--missing">
+                <span class="status-dot"></span>Missing
+              </span>
+            </div>
+          </template>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- ANALYTICS PAGE -->
   <div class="page" x-show="page==='stats'" x-data="statsPage()" x-init="load()">
-    <h2 style="font-size:18px;margin-bottom:20px">Analytics</h2>
-    <div x-show="loading" class="loading">Loading analytics...</div>
+    <header class="page-header">
+      <h1 class="page-title">Analytics.</h1>
+      <p class="page-subtitle">A study journal in numbers</p>
+    </header>
+
+    <div x-show="loading" class="loading"><span class="spinner"></span> Loading…</div>
     <template x-if="!loading">
-      <div>
+      <div class="timeline">
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-num" x-text="summary.done"></div><div>Done</div></div>
-          <div class="stat-card"><div class="stat-num" x-text="summary.in_progress"></div><div>In Progress</div></div>
-          <div class="stat-card"><div class="stat-num" x-text="summary.not_started"></div><div>Not Started</div></div>
-          <div class="stat-card"><div class="stat-num" x-text="formatTime(summary.total_time_spent)"></div><div>Total Time</div></div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="summary.done"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Done</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="summary.in_progress"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">In Progress</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="summary.not_started"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Not Started</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num stat-num--time" x-html="formatTimeRich(summary.total_time_spent)"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Total Time</div>
+          </div>
         </div>
-        <canvas id="timeChart" height="80"></canvas>
-        <div class="category-bars" style="margin-top:24px">
-          <template x-for="cat in byCategory" :key="cat.category">
-            <div class="cat-row">
-              <span x-text="cat.category"></span>
-              <div class="cat-track">
-                <div class="cat-fill" :style="`width:${cat.total>0?(cat.done/cat.total)*100:0}%`"></div>
+
+        <h2 class="section-head">Time per Lab — slowest first</h2>
+        <div class="section-body">
+          <canvas id="timeChart" height="80"></canvas>
+        </div>
+
+        <h2 class="section-head">Progress by Category</h2>
+        <div class="section-body">
+          <div class="category-bars">
+            <template x-for="cat in byCategory" :key="cat.category">
+              <div class="cat-row">
+                <span class="cat-name" x-text="cat.category"></span>
+                <div class="cat-track">
+                  <div class="cat-fill" :style="`width:${cat.total>0?(cat.done/cat.total)*100:0}%`"></div>
+                </div>
+                <span class="cat-count" x-text="`${cat.done} / ${cat.total}`"></span>
               </div>
-              <span x-text="`${cat.done}/${cat.total}`"></span>
-            </div>
-          </template>
+            </template>
+          </div>
         </div>
       </div>
     </template>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div class="modal-backdrop" x-show="$store.modal.open" x-cloak
+    @click="$store.modal.cancel()"
+    @keydown.escape.window="$store.modal.cancel()">
+    <div class="modal" @click.stop>
+      <div class="modal-title" x-show="$store.modal.title" x-text="$store.modal.title"></div>
+      <p class="modal-message" x-text="$store.modal.message"></p>
+      <div class="modal-actions">
+        <button class="modal-btn modal-btn--cancel" @click="$store.modal.cancel()">Cancel</button>
+        <button class="modal-btn modal-btn--ok" :class="{ 'modal-btn--danger': $store.modal.danger }"
+          @click="$store.modal.ok()">Confirm</button>
+      </div>
+    </div>
   </div>
 
 </body>
