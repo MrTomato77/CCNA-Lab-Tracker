@@ -242,7 +242,7 @@ a { color: inherit; text-decoration: none; }
   align-items: flex-end;
   padding: 16px 0 28px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 .hero-left { display: flex; flex-direction: column; gap: 10px; }
 .hero-stat {
