@@ -400,6 +400,30 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
 }
+
+/* Filter chip / dropdown click → cards fade out, the grid collapses, then
+   matching cards fade in. Enter is delayed by the leave duration so the
+   two phases are sequenced — without the delay both run concurrently and
+   incoming cards spawn at their old DOM position before jumping up as
+   leaving cards collapse from layout, which reads as a stutter. */
+.card-fade-leave {
+  transition: opacity 130ms ease-out;
+}
+.card-fade-enter {
+  transition: opacity 180ms ease-out 130ms;
+}
+.card-fade-enter-from,
+.card-fade-leave-to {
+  opacity: 0;
+}
+.card-fade-enter-to,
+.card-fade-leave-from {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-fade-enter,
+  .card-fade-leave { transition: none; }
+}
 .lab-card:hover {
   background: var(--surface-2);
   border-color: var(--border-2);

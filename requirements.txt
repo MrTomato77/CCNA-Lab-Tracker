@@ -3,6 +3,5 @@ aiosqlite
 pydantic>=2.0
 loguru
 python-dotenv
-rich
 aiofiles
 pypdf

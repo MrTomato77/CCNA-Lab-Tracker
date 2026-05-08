@@ -1,3 +1,51 @@
+// ── Shared constants ──────────────────────────────────────────────────────
+// Mirror of core/constants.py — sync manually when adding values backend-side.
+const STATUS = Object.freeze({
+  NOT_STARTED: 'not_started',
+  IN_PROGRESS: 'in_progress',
+  DONE:        'done',
+});
+const STATUS_LABELS = Object.freeze({
+  not_started: 'Not Started',
+  in_progress: 'In Progress',
+  done:        'Done',
+});
+const CATEGORIES = Object.freeze([
+  'CLI & Basic',     'Switching & VLAN', 'Wireless',
+  'Inter-VLAN & Routing', 'HSRP & ACL',  'NAT & DHCP',
+  'Management',      'Security & Advanced',
+]);
+
+// 8h cap on resumed timers — see labCard.init() for rationale.
+const TIMER_RESUME_CAP_SEC = 8 * 3600;
+
+// ── Fetch wrapper ─────────────────────────────────────────────────────────
+// All POST sites used to repeat the same `headers` + `JSON.stringify` body
+// shape. Wrap once. GET keeps working — pass no body, returns parsed JSON.
+async function api(path, { method = 'GET', body = null } = {}) {
+  const opts = { method };
+  if (body !== null) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body    = JSON.stringify(body);
+  }
+  const res = await fetch(path, opts);
+  return res.json();
+}
+
+// ── Time formatting ───────────────────────────────────────────────────────
+// One helper, three render modes — replaces the three near-duplicates that
+// used to live on appShell, labCard, and statsPage.
+//   'clock'   → "HH:MM:SS"   (timer display)
+//   'compact' → "4h 32m"     (totals)
+//   'rich'    → "4ʰ 32ᵐ"     (stats blocks, with <sup> markup)
+function formatTime(s = 0, mode = 'clock') {
+  s = Math.max(0, s | 0);
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+  if (mode === 'compact') return h > 0 ? `${h}h ${m}m` : `${m}m`;
+  if (mode === 'rich')    return h > 0 ? `${h}<sup>h</sup> ${m}<sup>m</sup>` : `${m}<sup>m</sup>`;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+}
+
 // Alpine store — single source of truth for summary so any component can
 // trigger a refresh after a mutation (status change, timer stop) and the
 // dashboard progress bar / analytics page pick it up immediately.
@@ -7,8 +55,7 @@ document.addEventListener("alpine:init", () => {
                completion_percent:0, total_time_spent:0 },
     async refreshSummary() {
       try {
-        const res  = await fetch("/api/stats/summary");
-        const json = await res.json();
+        const json = await api("/api/stats/summary");
         if (json.success) this.summary = json.data;
       } catch (e) { console.error("Summary refresh failed:", e); }
     }
@@ -38,11 +85,7 @@ window.appShell = function() {
     hideStatus: "",
     statusOpen: false,
     theme: document.documentElement.getAttribute("data-theme") || "light",
-    categories: [
-      "CLI & Basic", "Switching & VLAN", "Wireless",
-      "Inter-VLAN & Routing", "HSRP & ACL", "NAT & DHCP",
-      "Management", "Security & Advanced"
-    ],
+    categories: CATEGORIES,
 
     get summary() { return this.$store.app.summary; },
 
@@ -64,8 +107,7 @@ window.appShell = function() {
     async fetchLabs() {
       this.loading = true;
       try {
-        const labsRes = await fetch("/api/labs");
-        this.labs = (await labsRes.json()).data;
+        this.labs = (await api("/api/labs")).data;
         await this.$store.app.refreshSummary();
       } catch (e) {
         console.error("Failed to load labs:", e);
@@ -81,8 +123,7 @@ window.appShell = function() {
       );
       if (!ok) return;
       try {
-        const res = await fetch("/api/labs/reset", { method: "POST" });
-        const json = await res.json();
+        const json = await api("/api/labs/reset", { method: "POST" });
         if (json.success) {
           await this.fetchLabs();
           window.showToast("+ All labs have been reset successfully!", 'success');
@@ -95,22 +136,17 @@ window.appShell = function() {
       }
     },
 
-    get filteredLabs() {
-      const cat = this.filterCat;
-      const hide = this.hideStatus;
-      return this.labs.filter(lab => {
-        const matchCat = !cat || lab.category === cat;
-        let matchStatus = true;
-        if (hide === 'done') matchStatus = lab.status !== 'done';
-        if (hide === 'undone') matchStatus = lab.status === 'done';
-        return matchCat && matchStatus;
-      });
+    // Predicate form (used by x-show on each card so Alpine can transition
+    // entering/leaving cards). The old filteredLabs getter is gone — cards
+    // stay in DOM and are toggled via x-show/x-transition for fade in/out.
+    matchesFilter(lab) {
+      if (this.filterCat && lab.category !== this.filterCat) return false;
+      if (this.hideStatus === 'done'   && lab.status === STATUS.DONE) return false;
+      if (this.hideStatus === 'undone' && lab.status !== STATUS.DONE) return false;
+      return true;
     },
 
-    formatTotalTime(s = 0) {
-      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-      return h > 0 ? `${h}h ${m}m` : `${m}m`;
-    }
+    formatTotalTime(s = 0) { return formatTime(s, 'compact'); }
   }
 }
 
@@ -126,14 +162,13 @@ window.labCard = function(initialLab) {
     init() {
       // Resume an open timer session if one exists. open_session_started_at is
       // delivered inline with GET /api/labs via correlated subquery.
-      // 8-hour cap: if resumed elapsed is implausibly large (laptop sleep,
-      // clock drift, zombie row that slipped past startup cleanup), treat
-      // the session as abandoned rather than crediting bogus time.
+      // The cap guards against laptop-sleep / clock-drift / zombie sessions
+      // that slipped past startup cleanup — better to drop those than to
+      // credit bogus hours.
       if (!this.lab.open_session_started_at) return;
       const started = new Date(this.lab.open_session_started_at);
       const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
-      const EIGHT_HOURS = 8 * 3600;
-      if (elapsed < 0 || elapsed > EIGHT_HOURS) return;
+      if (elapsed < 0 || elapsed > TIMER_RESUME_CAP_SEC) return;
       this.sessionStart = started;
       this.elapsed = elapsed;
       this.running = true;
@@ -146,10 +181,9 @@ window.labCard = function(initialLab) {
       this.elapsed = 0;
       this.running = true;
       // Persist open session immediately (duration=0 = signal for open)
-      await fetch(`/api/labs/${this.lab.id}/timer`, {
+      await api(`/api/labs/${this.lab.id}/timer`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ started_at: this.sessionStart.toISOString(), duration: 0 })
+        body: { started_at: this.sessionStart.toISOString(), duration: 0 },
       });
       this.lab.open_session_started_at = this.sessionStart.toISOString();
       this.interval = setInterval(() => this.elapsed++, 1000);
@@ -161,17 +195,15 @@ window.labCard = function(initialLab) {
       this.running = false;
       const duration = this.elapsed;
       try {
-        const res  = await fetch(`/api/labs/${this.lab.id}/timer`, {
+        const json = await api(`/api/labs/${this.lab.id}/timer`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ started_at: this.sessionStart.toISOString(), duration })
+          body: { started_at: this.sessionStart.toISOString(), duration },
         });
-        const json = await res.json();
         if (json.success) {
           this.lab.time_spent = json.data.time_spent;
           // Auto-mark done after stop (per user-confirmed launch flow)
-          this.lab.status = 'done';
-          await this.updateStatus('done');
+          this.lab.status = STATUS.DONE;
+          await this.updateStatus(STATUS.DONE);
           window.showToast("+ Time saved & marked done", 'success');
         }
       } catch (e) {
@@ -196,10 +228,9 @@ window.labCard = function(initialLab) {
       );
       if (!ok) return;
       try {
-        const res = await fetch(`/api/labs/reset-single/${this.lab.id}`, { method: "POST" });
-        const json = await res.json();
+        const json = await api(`/api/labs/reset-single/${this.lab.id}`, { method: "POST" });
         if (json.success) {
-          this.lab.status = 'not_started';
+          this.lab.status = STATUS.NOT_STARTED;
           this.lab.time_spent = 0;
           this.resetTimer();
           await Alpine.store("app").refreshSummary();
@@ -213,10 +244,9 @@ window.labCard = function(initialLab) {
     async updateStatus(newStatus = null) {
       try {
         const status = newStatus || this.lab.status;
-        await fetch(`/api/labs/${this.lab.id}/status`, {
+        await api(`/api/labs/${this.lab.id}/status`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: status })
+          body: { status },
         });
         if (newStatus) {
           this.lab.status = newStatus;
@@ -246,8 +276,7 @@ window.labCard = function(initialLab) {
         return;
       }
       try {
-        const res  = await fetch(`/api/labs/${this.lab.id}/open`, { method: "POST" });
-        const json = await res.json();
+        const json = await api(`/api/labs/${this.lab.id}/open`, { method: "POST" });
         if (json.success) {
           window.showToast("+ Opening in Packet Tracer...", 'success');
           if (!this.running) {
@@ -261,15 +290,10 @@ window.labCard = function(initialLab) {
       }
     },
 
-    formatTime(s = 0) {
-      const h   = Math.floor(s / 3600);
-      const m   = Math.floor((s % 3600) / 60);
-      const sec = s % 60;
-      return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:${String(sec).padStart(2,"0")}`;
-    },
+    formatTime(s = 0) { return formatTime(s, 'clock'); },
 
     statusLabel() {
-      return { not_started:"Not Started", in_progress:"In Progress", done:"Done" }[this.lab.status] ?? "";
+      return STATUS_LABELS[this.lab.status] ?? "";
     },
     badgeClass() { return `badge badge--${this.lab.status}`; },
     cardClass()  {
@@ -291,8 +315,7 @@ window.importPage = function() {
 
     async loadStatus() {
       try {
-        const res  = await fetch("/api/import/status");
-        const json = await res.json();
+        const json = await api("/api/import/status");
         if (json.success) this.status = json.data;
       } catch (e) { console.error("Status load failed:", e); }
     },
@@ -326,21 +349,22 @@ window.importPage = function() {
       if (!this.folderPath.trim()) return;
       this.scanning = true;
       try {
-        const res  = await fetch("/api/import/scan", {
+        const json = await api("/api/import/scan", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ folder_path: this.folderPath.trim() })
+          body:   { folder_path: this.folderPath.trim() },
         });
-        const json = await res.json();
         if (json.success) {
           this.results       = json.data.results;
           this.importedCount = json.data.imported_count;
           await this.loadStatus();
         } else {
-          alert(`Error: ${json.error}`);
+          window.showToast(`× ${json.error}`, 'error');
         }
-      } catch (e) { alert("Network error during scan."); }
-      finally     { this.scanning = false; }
+      } catch (e) {
+        window.showToast("× Network error during scan", 'error');
+      } finally {
+        this.scanning = false;
+      }
     }
   }
 }
@@ -357,13 +381,13 @@ window.statsPage = function() {
     async load() {
       this.loading = true;
       try {
-        const [, catRes, slowRes] = await Promise.all([
+        const [, cat, slow] = await Promise.all([
           this.$store.app.refreshSummary(),
-          fetch("/api/stats/by-category"),
-          fetch("/api/stats/slowest")
+          api("/api/stats/by-category"),
+          api("/api/stats/slowest"),
         ]);
-        this.byCategory = (await catRes.json()).data;
-        const slowest   = (await slowRes.json()).data;
+        this.byCategory = cat.data;
+        const slowest   = slow.data;
         this._slowest   = slowest;
         this.loading    = false;
         // x-if unmounts the chart container while loading=true, so we must
@@ -425,17 +449,8 @@ window.statsPage = function() {
       });
     },
 
-    formatTime(s = 0) {
-      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-      return h > 0 ? `${h}h ${m}m` : `${m}m`;
-    },
-
-    // Editorial-styled time: "4ʰ 32ᵐ" with superscript markup for stat blocks
-    formatTimeRich(s = 0) {
-      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-      if (h > 0) return `${h}<sup>h</sup> ${m}<sup>m</sup>`;
-      return `${m}<sup>m</sup>`;
-    }
+    formatTime(s = 0)     { return formatTime(s, 'compact'); },
+    formatTimeRich(s = 0) { return formatTime(s, 'rich');    }
   }
 }
 

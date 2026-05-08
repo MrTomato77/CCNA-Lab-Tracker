@@ -1,8 +1,8 @@
 from pydantic import BaseModel, field_validator
-from typing import Literal
+from core.constants import Status
 
 class StatusUpdate(BaseModel):
-    status: Literal["not_started", "in_progress", "done"]
+    status: Status
 
 class TimerSave(BaseModel):
     started_at: str

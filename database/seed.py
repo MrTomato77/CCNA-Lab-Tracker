@@ -56,7 +56,7 @@ LAB_DEFINITIONS = [
 ]
 
 async def seed_labs(db: aiosqlite.Connection):
-    logger.info("Seeding 51 labs (metadata only — file_path stays NULL until import)...")
+    logger.info(f"Seeding {len(LAB_DEFINITIONS)} labs (metadata only — file_path stays NULL until import)...")
     for lab_id, name, category in LAB_DEFINITIONS:
         await db.execute(
             "INSERT OR IGNORE INTO labs (id, name, category) VALUES (?,?,?)",

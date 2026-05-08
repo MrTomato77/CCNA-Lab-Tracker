@@ -2,9 +2,8 @@ import os
 import subprocess
 from pathlib import Path
 from loguru import logger
-from dotenv import load_dotenv
 
-load_dotenv()
+# `load_dotenv()` is called once in app.py before this module is imported.
 PT_EXE = os.getenv("PACKET_TRACER_EXE", r"C:\Program Files\Cisco Packet Tracer\PacketTracer.exe")
 
 async def launch_pka(file_path: str | None) -> dict:

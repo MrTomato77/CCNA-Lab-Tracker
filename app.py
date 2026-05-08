@@ -14,15 +14,21 @@ load_dotenv()
 setup_logging()
 
 from pathlib import Path
+import aiofiles
 from robyn import Robyn, Request, Response
-from robyn.responses import serve_html
 from loguru import logger
 from database.connection import init_db, close_db
 from routers import labs, progress, launcher, stats, importer
 
 app = Robyn(__file__)
 
-PUBLIC = Path(__file__).parent / "public"
+PUBLIC   = Path(__file__).parent / "public"
+DOCS_DIR = Path(__file__).parent / "docs"
+
+# SPA shell + static assets — read once at startup (see startup_handler) so
+# the hot path doesn't run blocking sync I/O inside an async handler. PDFs
+# are too many and too large to cache, so they go through aiofiles below.
+_STATIC: dict[str, str] = {}
 
 # Static assets are served via explicit routes instead of serve_directory("/").
 # In Robyn 0.64.x, serve_directory mounted at "/" intercepts non-GET methods
@@ -31,14 +37,18 @@ PUBLIC = Path(__file__).parent / "public"
 # routes for the SPA shell + two static assets sidesteps that entirely.
 @app.get("/")
 async def index(request: Request):
-    return serve_html(str(PUBLIC / "index.html"))
+    return Response(
+        status_code=200,
+        headers={"Content-Type": "text/html; charset=utf-8"},
+        description=_STATIC["index.html"],
+    )
 
 @app.get("/style.css")
 async def style_css(request: Request):
     return Response(
         status_code=200,
         headers={"Content-Type": "text/css; charset=utf-8"},
-        description=(PUBLIC / "style.css").read_text(encoding="utf-8"),
+        description=_STATIC["style.css"],
     )
 
 @app.get("/app.js")
@@ -46,10 +56,8 @@ async def app_js(request: Request):
     return Response(
         status_code=200,
         headers={"Content-Type": "application/javascript; charset=utf-8"},
-        description=(PUBLIC / "app.js").read_text(encoding="utf-8"),
+        description=_STATIC["app.js"],
     )
-
-DOCS_DIR = Path(__file__).parent / "docs"
 
 @app.get("/docs/:filename")
 async def lab_docs(request: Request):
@@ -61,10 +69,12 @@ async def lab_docs(request: Request):
     pdf = DOCS_DIR / filename
     if not pdf.exists():
         return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
+    async with aiofiles.open(pdf, "rb") as f:
+        data = await f.read()
     return Response(
         status_code=200,
         headers={"Content-Type": "application/pdf"},
-        description=pdf.read_bytes(),
+        description=data,
     )
 
 # Register routers
@@ -97,6 +107,11 @@ async def startup():
     from services.pt_launcher import PT_EXE
     labs_dir = Path(__file__).parent / "labs"
     labs_dir.mkdir(exist_ok=True)
+    # Cache the SPA shell + static assets once. They're served on every
+    # page load and don't change at runtime, so reading them in async
+    # handlers would block the event loop for no benefit.
+    for name in ("index.html", "style.css", "app.js"):
+        _STATIC[name] = (PUBLIC / name).read_text(encoding="utf-8")
     await init_db()
     # Warn (don't fail) if Packet Tracer isn't where .env says — user may
     # want to browse progress even without PT installed on this machine.

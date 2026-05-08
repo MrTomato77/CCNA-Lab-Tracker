@@ -95,8 +95,15 @@
 
         <!-- Cards -->
         <div class="cards-grid">
-          <template x-for="(lab, idx) in filteredLabs" :key="lab.id">
-            <article x-data="labCard(lab)" x-init="init()" :class="cardClass()">
+          <template x-for="(lab, idx) in labs" :key="lab.id">
+            <article x-data="labCard(lab)" x-init="init()" :class="cardClass()"
+              x-show="matchesFilter(lab)"
+              x-transition:enter="card-fade-enter"
+              x-transition:enter-start="card-fade-enter-from"
+              x-transition:enter-end="card-fade-enter-to"
+              x-transition:leave="card-fade-leave"
+              x-transition:leave-start="card-fade-leave-from"
+              x-transition:leave-end="card-fade-leave-to">
               <!-- Col 1: identity -->
               <div class="lab-identity">
                 <div class="lab-badge" x-text="String(lab.id.replace('LAB-','')).padStart(2,'0')"></div>

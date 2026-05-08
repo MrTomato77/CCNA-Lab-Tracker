@@ -1,6 +1,6 @@
 from robyn import Request, SubRouter
+from services import lab_service
 from services.file_importer import import_from_folder, import_from_bytes
-from database.connection import get_db
 
 router = SubRouter(__name__, prefix="/api/import")
 
@@ -40,9 +40,7 @@ async def scan_folder(request: Request):
 
 @router.get("/status")
 async def import_status(request: Request):
-    db = await get_db()
-    async with db.execute("SELECT id, name, category, file_path FROM labs ORDER BY id") as cur:
-        rows = [dict(r) for r in await cur.fetchall()]
+    rows     = await lab_service.list_with_paths()
     imported = [r for r in rows if r["file_path"] is not None]
     missing  = [r for r in rows if r["file_path"] is None]
     return {"success": True, "data": {"imported": imported, "missing": missing,

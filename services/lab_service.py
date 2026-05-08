@@ -1,4 +1,5 @@
 import aiosqlite
+from core.constants import STATUS_NOT_STARTED
 from database.connection import get_db
 
 async def get_all_labs() -> list[dict]:
@@ -72,7 +73,8 @@ async def reset_all_labs():
     """Reset all labs to Not Started status and clear all timer data."""
     db = await get_db()
     await db.execute(
-        "UPDATE progress SET status='not_started', time_spent=0, last_opened=NULL"
+        "UPDATE progress SET status=?, time_spent=0, last_opened=NULL",
+        (STATUS_NOT_STARTED,),
     )
     await db.execute("DELETE FROM attempts")
     await db.commit()
@@ -81,8 +83,16 @@ async def reset_lab(lab_id: str):
     """Reset a specific lab to Not Started and clear its attempts."""
     db = await get_db()
     await db.execute(
-        "UPDATE progress SET status='not_started', time_spent=0, last_opened=NULL WHERE lab_id=?",
-        (lab_id,)
+        "UPDATE progress SET status=?, time_spent=0, last_opened=NULL WHERE lab_id=?",
+        (STATUS_NOT_STARTED, lab_id),
     )
     await db.execute("DELETE FROM attempts WHERE lab_id=?", (lab_id,))
     await db.commit()
+
+async def list_with_paths() -> list[dict]:
+    """Used by /api/import/status to show which labs have .pka and .pdf files."""
+    db = await get_db()
+    async with db.execute(
+        "SELECT id, name, category, file_path, docs_path FROM labs ORDER BY id"
+    ) as cur:
+        return [dict(r) for r in await cur.fetchall()]
