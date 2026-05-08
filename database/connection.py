@@ -27,6 +27,11 @@ async def init_db():
         await _db.execute("ALTER TABLE labs ADD COLUMN docs_path TEXT DEFAULT NULL")
     except aiosqlite.OperationalError:
         pass
+    for col in ("difficulty INTEGER", "estimated_minutes INTEGER"):
+        try:
+            await _db.execute(f"ALTER TABLE labs ADD COLUMN {col} DEFAULT NULL")
+        except aiosqlite.OperationalError:
+            pass
     # Zombie-session cleanup: if the last run crashed mid-timer, an attempts
     # row with duration IS NULL would "resume" on next load as a multi-day
     # timer and add bogus hours to time_spent. Delete stale open sessions —

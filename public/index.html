@@ -102,7 +102,23 @@
                 <div class="lab-badge" x-text="String(lab.id.replace('LAB-','')).padStart(2,'0')"></div>
                 <div class="lab-content">
                   <div class="lab-name" x-text="lab.name"></div>
-                  <div class="lab-category" x-text="lab.category"></div>
+                  <div class="lab-meta-row">
+                    <span class="lab-category" x-text="lab.category"></span>
+                    <span class="meta-sep" x-show="lab.difficulty" aria-hidden="true">·</span>
+                    <span class="difficulty-dots" x-show="lab.difficulty"
+                      :title="`Difficulty: ${lab.difficulty}/5`">
+                      <span class="difficulty-dot" :class="lab.difficulty >= 1 ? 'difficulty-dot--on' : ''"></span>
+                      <span class="difficulty-dot" :class="lab.difficulty >= 2 ? 'difficulty-dot--on' : ''"></span>
+                      <span class="difficulty-dot" :class="lab.difficulty >= 3 ? 'difficulty-dot--on' : ''"></span>
+                      <span class="difficulty-dot" :class="lab.difficulty >= 4 ? 'difficulty-dot--on' : ''"></span>
+                      <span class="difficulty-dot" :class="lab.difficulty >= 5 ? 'difficulty-dot--on' : ''"></span>
+                    </span>
+                    <span class="meta-sep" x-show="lab.estimated_minutes" aria-hidden="true">·</span>
+                    <span class="est-time" x-show="lab.estimated_minutes">
+                      <span class="est-time-icon" aria-hidden="true">⏱</span>
+                      <span x-text="`~${lab.estimated_minutes}m`"></span>
+                    </span>
+                  </div>
                 </div>
               </div>
               <!-- Col 2: reset (left) + timer (right), reset only when done -->

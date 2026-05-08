@@ -463,10 +463,50 @@ a { color: inherit; text-decoration: none; }
   letter-spacing: -0.005em;
   line-height: 1.35;
 }
-.lab-category {
+.lab-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 3px;
   font-size: 13px;
   color: var(--text-3);
+  line-height: 1.4;
+}
+.lab-category {
   font-weight: 400;
+}
+.meta-sep {
+  color: var(--text-4, var(--border-2));
+  font-weight: 600;
+  user-select: none;
+}
+.difficulty-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.difficulty-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--border-2);
+  transition: background 160ms ease;
+}
+.difficulty-dot--on { background: var(--accent); }
+.lab-card--in_progress .difficulty-dot--on { background: var(--in-progress); }
+.lab-card--done        .difficulty-dot--on { background: var(--done); }
+.est-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.est-time-icon {
+  font-size: 12px;
+  line-height: 1;
+  opacity: 0.85;
 }
 
 .lab-identity {
