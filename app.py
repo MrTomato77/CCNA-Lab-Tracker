@@ -29,6 +29,7 @@ DOCS_DIR = (Path(__file__).parent / "docs").resolve()
 # the hot path doesn't run blocking sync I/O inside an async handler. PDFs
 # are too many and too large to cache, so they go through aiofiles below.
 _STATIC: dict[str, str] = {}
+_STATIC_BIN: dict[str, bytes] = {}   # binary assets (favicon)
 
 # Static assets are served via explicit routes instead of serve_directory("/").
 # In Robyn 0.64.x, serve_directory mounted at "/" intercepts non-GET methods
@@ -58,6 +59,21 @@ async def app_js(request: Request):
         headers={"Content-Type": "application/javascript; charset=utf-8"},
         description=_STATIC["app.js"],
     )
+
+@app.get("/logo.ico")
+async def logo_ico(request: Request):
+    return Response(
+        status_code=200,
+        headers={"Content-Type": "image/x-icon",
+                 "Cache-Control": "public, max-age=86400"},
+        description=_STATIC_BIN["logo.ico"],
+    )
+
+@app.get("/favicon.ico")
+async def favicon_ico(request: Request):
+    # Browsers request /favicon.ico unconditionally even when the HTML
+    # specifies a different icon path. Alias to keep the access log clean.
+    return await logo_ico(request)
 
 @app.get("/docs/:filename")
 async def lab_docs(request: Request):
@@ -116,6 +132,7 @@ async def startup():
     # handlers would block the event loop for no benefit.
     for name in ("index.html", "style.css", "app.js"):
         _STATIC[name] = (PUBLIC / name).read_text(encoding="utf-8")
+    _STATIC_BIN["logo.ico"] = (PUBLIC / "logo.ico").read_bytes()
     await init_db()
     # Warn (don't fail) if Packet Tracer isn't where .env says — user may
     # want to browse progress even without PT installed on this machine.
