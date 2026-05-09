@@ -71,20 +71,25 @@
 
         <!-- Filter chips -->
         <div class="filter-strip">
-          <div class="status-select">
-            <button class="status-filter" @click="statusOpen = !statusOpen" @click.outside="statusOpen = false">
+          <div class="status-select" @keydown.escape.prevent="statusOpen = false; $refs.statusTrigger.focus()">
+            <button class="status-filter" x-ref="statusTrigger"
+              aria-haspopup="menu" :aria-expanded="statusOpen.toString()"
+              @click="statusOpen = !statusOpen" @click.outside="statusOpen = false"
+              @keydown.arrow-down.prevent="statusOpen = true; $nextTick(() => $refs.statusMenu.querySelector('.status-option')?.focus())">
               <span x-text="{ '': 'All status', done: 'Hide done', undone: 'Hide not done' }[hideStatus]"></span>
               <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M1 1l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
-            <div class="status-dropdown" x-show="statusOpen" x-cloak>
-              <button class="status-option" :class="{ active: hideStatus === '' }"
-                @click="hideStatus = ''; statusOpen = false">All status</button>
-              <button class="status-option" :class="{ active: hideStatus === 'done' }"
-                @click="hideStatus = 'done'; statusOpen = false">Hide done</button>
-              <button class="status-option" :class="{ active: hideStatus === 'undone' }"
-                @click="hideStatus = 'undone'; statusOpen = false">Hide not done</button>
+            <div class="status-dropdown" role="menu" x-ref="statusMenu" x-show="statusOpen" x-cloak
+              @keydown.arrow-down.prevent="$event.target.nextElementSibling?.focus()"
+              @keydown.arrow-up.prevent="$event.target.previousElementSibling?.focus()">
+              <button class="status-option" role="menuitem" :class="{ active: hideStatus === '' }"
+                @click="hideStatus = ''; statusOpen = false; $refs.statusTrigger.focus()">All status</button>
+              <button class="status-option" role="menuitem" :class="{ active: hideStatus === 'done' }"
+                @click="hideStatus = 'done'; statusOpen = false; $refs.statusTrigger.focus()">Hide done</button>
+              <button class="status-option" role="menuitem" :class="{ active: hideStatus === 'undone' }"
+                @click="hideStatus = 'undone'; statusOpen = false; $refs.statusTrigger.focus()">Hide not done</button>
             </div>
           </div>
           <button class="filter-chip" @click="filterCat=''" :class="{active:filterCat===''}">All</button>
