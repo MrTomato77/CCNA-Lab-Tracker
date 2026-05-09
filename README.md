@@ -2,6 +2,12 @@
 
 Local web app for tracking your CCNA Packet Tracer lab progress.
 
+## Setup (first run after clone)
+
+Copy `.env.example` to `.env`. Defaults work for a stock Packet Tracer
+install; tweak `PACKET_TRACER_EXE` only if your path is non-standard
+(see "Custom Packet Tracer Path" below).
+
 ## Quick Start
 
 1. Double-click `start.bat`

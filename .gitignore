@@ -9,3 +9,12 @@ __pycache__/
 *.pyc
 *.pdf
 *.pka
+
+# Per-machine config — copy `.env.example` to `.env` after cloning.
+.env
+.env.local
+
+# IDE workspace files (none currently tracked; keeps PyCharm / VS Code
+# settings out if anyone opens the repo there).
+.vscode/
+.idea/
