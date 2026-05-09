@@ -1,10 +1,23 @@
 import aiosqlite
 from pathlib import Path
+from loguru import logger
 
 DB_PATH    = Path(__file__).parent / "labs.db"
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
 _db: aiosqlite.Connection | None = None
+
+
+async def _add_column_if_missing(db: aiosqlite.Connection, table: str, col: str, decl: str):
+    """PRAGMA-driven additive migration. The previous try/except-OperationalError
+    pattern swallowed real failures (locked DB, disk full, schema corruption)
+    as if they were "duplicate column" — leaving the app running on a half-
+    migrated schema. Pre-checking the column list lets real errors propagate."""
+    cur  = await db.execute(f"PRAGMA table_info({table})")
+    cols = {row[1] for row in await cur.fetchall()}
+    if col not in cols:
+        await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+        logger.bind(name="db").info(f"migration: added {table}.{col}")
 
 async def get_db() -> aiosqlite.Connection:
     global _db
@@ -19,19 +32,12 @@ async def init_db():
     await _db.execute("PRAGMA journal_mode=WAL")
     await _db.execute("PRAGMA foreign_keys=ON")
     await _db.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-    # Idempotent migration: docs_path was added after the initial schema.
-    # CREATE TABLE IF NOT EXISTS won't add the column to an existing table,
-    # so apply ALTER TABLE here and swallow the "duplicate column" error
-    # on subsequent boots.
-    try:
-        await _db.execute("ALTER TABLE labs ADD COLUMN docs_path TEXT DEFAULT NULL")
-    except aiosqlite.OperationalError:
-        pass
-    for col in ("difficulty INTEGER", "estimated_minutes INTEGER"):
-        try:
-            await _db.execute(f"ALTER TABLE labs ADD COLUMN {col} DEFAULT NULL")
-        except aiosqlite.OperationalError:
-            pass
+    # Idempotent additive migrations. CREATE TABLE IF NOT EXISTS won't add
+    # columns to an existing table, so check via PRAGMA table_info and only
+    # ALTER when the column is absent. Real errors propagate.
+    await _add_column_if_missing(_db, "labs", "docs_path",         "TEXT DEFAULT NULL")
+    await _add_column_if_missing(_db, "labs", "difficulty",        "INTEGER DEFAULT NULL")
+    await _add_column_if_missing(_db, "labs", "estimated_minutes", "INTEGER DEFAULT NULL")
     # Zombie-session cleanup: if the last run crashed mid-timer, an attempts
     # row with duration IS NULL would "resume" on next load as a multi-day
     # timer and add bogus hours to time_spent. Delete stale open sessions —

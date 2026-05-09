@@ -172,7 +172,16 @@ window.labCard = function(initialLab) {
       this.sessionStart = started;
       this.elapsed = elapsed;
       this.running = true;
-      this.interval = setInterval(() => this.elapsed++, 1000);
+      this.interval = setInterval(() => this.tickElapsed(), 1000);
+    },
+
+    // Skip increment when the card is hidden by category/status filter
+    // (x-show toggles display:none, which makes offsetParent null). Wall-
+    // clock duration on stop still uses sessionStart, so a paused display
+    // doesn't lose any real time — it just stops re-rendering.
+    tickElapsed() {
+      if (this.$el && this.$el.offsetParent === null) return;
+      this.elapsed++;
     },
 
     async startTimer() {
@@ -186,7 +195,7 @@ window.labCard = function(initialLab) {
         body: { started_at: this.sessionStart.toISOString(), duration: 0 },
       });
       this.lab.open_session_started_at = this.sessionStart.toISOString();
-      this.interval = setInterval(() => this.elapsed++, 1000);
+      this.interval = setInterval(() => this.tickElapsed(), 1000);
     },
 
     async stopTimer() {

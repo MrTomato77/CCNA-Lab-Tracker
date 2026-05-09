@@ -23,7 +23,7 @@ from routers import labs, progress, launcher, stats, importer
 app = Robyn(__file__)
 
 PUBLIC   = Path(__file__).parent / "public"
-DOCS_DIR = Path(__file__).parent / "docs"
+DOCS_DIR = (Path(__file__).parent / "docs").resolve()
 
 # SPA shell + static assets — read once at startup (see startup_handler) so
 # the hot path doesn't run blocking sync I/O inside an async handler. PDFs
@@ -61,13 +61,17 @@ async def app_js(request: Request):
 
 @app.get("/docs/:filename")
 async def lab_docs(request: Request):
-    # filename arrives as e.g. "LAB-07.pdf"; reject anything else to keep
-    # this route from doubling as a generic file-server.
+    # filename arrives as e.g. "LAB-07.pdf". Resolve the candidate path and
+    # confirm it stays inside DOCS_DIR — defeats `..`, encoded variants, and
+    # symlink farms that the old slash-reject couldn't catch.
     filename = request.path_params.get("filename", "")
-    if not filename.endswith(".pdf") or "/" in filename or "\\" in filename:
+    if not filename.endswith(".pdf"):
         return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
-    pdf = DOCS_DIR / filename
-    if not pdf.exists():
+    try:
+        pdf = (DOCS_DIR / filename).resolve()
+    except (OSError, ValueError):
+        return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
+    if not pdf.is_relative_to(DOCS_DIR) or not pdf.is_file():
         return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
     async with aiofiles.open(pdf, "rb") as f:
         data = await f.read()

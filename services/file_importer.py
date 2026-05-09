@@ -9,6 +9,11 @@ LABS_FILES_DIR = Path(__file__).parent.parent / "labs"
 
 _MAX_LAB_NUMBER = 51   # bump if LAB_DEFINITIONS in database/seed.py grows
 
+# Real .pka files are ~1–5 MB. A 100 MB ceiling rejects ZIP-bomb-style
+# uploads and accidental drops of large unrelated files (videos, ISOs)
+# without cramping any legitimate Packet Tracer save.
+_MAX_FILE_BYTES = 100 * 1024 * 1024
+
 def extract_lab_id(filename: str) -> str | None:
     """
     Extract LAB-XX from irregular filenames:
@@ -42,6 +47,9 @@ async def import_from_bytes(filename: str, content: bytes) -> dict:
     lab_id = extract_lab_id(filename)
     if not lab_id:
         return {"file": filename, "status": "skipped", "reason": "Cannot extract LAB-XX from filename"}
+    if len(content) > _MAX_FILE_BYTES:
+        return {"file": filename, "lab_id": lab_id, "status": "skipped",
+                "reason": f"File exceeds {_MAX_FILE_BYTES // (1024*1024)} MB limit"}
     dest = dest_path(lab_id)
     try:
         async with aiofiles.open(dest, "wb") as f:
@@ -59,6 +67,13 @@ async def import_single_file(src: Path) -> dict:
     lab_id = extract_lab_id(src.name)
     if not lab_id:
         return {"file": src.name, "status": "skipped", "reason": "Cannot extract LAB-XX from filename"}
+    try:
+        size = src.stat().st_size
+    except OSError as e:
+        return {"file": src.name, "lab_id": lab_id, "status": "error", "reason": str(e)}
+    if size > _MAX_FILE_BYTES:
+        return {"file": src.name, "lab_id": lab_id, "status": "skipped",
+                "reason": f"File exceeds {_MAX_FILE_BYTES // (1024*1024)} MB limit"}
     dest = dest_path(lab_id)
     try:
         shutil.copy2(str(src), str(dest))
@@ -73,7 +88,15 @@ async def import_from_folder(folder_path: str) -> list[dict]:
     folder = Path(folder_path)
     if not folder.exists() or not folder.is_dir():
         raise ValueError(f"Folder not found: {folder_path}")
-    pka_files = list(folder.rglob("*.pka"))
+    # Drop symlinks before iterating — rglob() follows them silently and
+    # would let a hostile drop-folder pull `.pka`-named symlinks pointing
+    # anywhere on disk into the import pipeline.
+    pka_files = []
+    for f in folder.rglob("*.pka"):
+        if f.is_symlink():
+            logger.warning(f"Skipping symlink: {f}")
+            continue
+        pka_files.append(f)
     if not pka_files:
         raise ValueError(f"No .pka files found in: {folder_path}")
     return [await import_single_file(f) for f in pka_files]
