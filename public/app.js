@@ -219,6 +219,17 @@ window.labCard = function(initialLab) {
           // Auto-mark done after stop (per user-confirmed launch flow)
           this.lab.status = STATUS.DONE;
           await this.updateStatus(STATUS.DONE);
+          // Close PT after the save lands. A close failure is non-fatal —
+          // the timer is already saved, so surface a soft warning and let
+          // the user close PT themselves rather than blocking the flow.
+          try {
+            const closeRes = await api(`/api/labs/${this.lab.id}/close`, { method: "POST" });
+            if (!closeRes.success) {
+              window.showToast("! Time saved, but couldn't close Packet Tracer", 'info');
+            }
+          } catch (_) {
+            window.showToast("! Time saved, but couldn't reach close endpoint", 'info');
+          }
           window.showToast("+ Time saved & marked done", 'success');
         }
       } catch (e) {
