@@ -1,6 +1,10 @@
+import ctypes
 import os
 import subprocess
 import sys
+import threading
+import time
+from ctypes import wintypes
 from pathlib import Path
 from loguru import logger
 
@@ -13,15 +17,77 @@ PT_EXE = os.getenv("PACKET_TRACER_EXE", r"C:\Program Files\Cisco Packet Tracer\P
 _pt_processes: dict[str, subprocess.Popen] = {}
 
 
-def _maximized_startupinfo():
-    """Windows: ask the shell to open the new window maximized.
-    On non-Windows this returns None and Popen ignores the arg."""
+# Win32 constants for the post-launch maximize. PT is a Qt app and Qt
+# ignores STARTUPINFO.wShowWindow / nCmdShow — the only mechanism that
+# actually takes effect is calling ShowWindow on the live HWND once the
+# main window is visible.
+_SW_MAXIMIZE   = 3
+_GW_OWNER      = 4
+_MAX_WAIT_SEC  = 10.0
+_POLL_INTERVAL = 0.2
+
+
+def _maximize_after_launch(pid: int) -> None:
+    """Poll top-level windows for one owned by `pid`, then ShowWindow it
+    maximized. Runs on a daemon thread so launch_pka can return.
+
+    Why this and not STARTUPINFO: PT is a Qt app and Qt ignores the
+    nCmdShow hint passed via STARTUPINFO. Setting the window state
+    after the window exists is the only mechanism that takes effect.
+    """
     if sys.platform != "win32":
-        return None
-    si = subprocess.STARTUPINFO()
-    si.dwFlags    |= subprocess.STARTF_USESHOWWINDOW
-    si.wShowWindow = 3   # SW_SHOWMAXIMIZED
-    return si
+        return
+
+    user32 = ctypes.windll.user32
+    EnumWindowsProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def _try_once() -> int:
+        hits: list[int] = []
+
+        def cb(hwnd, _lparam):
+            if not user32.IsWindowVisible(hwnd):
+                return True
+            owner_pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner_pid))
+            if owner_pid.value != pid:
+                return True
+            # Skip the splash screen (no title) and any owned dialogs
+            # (tooltips, log popups) that share PT's PID.
+            if user32.GetWindowTextLengthW(hwnd) <= 0:
+                return True
+            if user32.GetWindow(hwnd, _GW_OWNER) != 0:
+                return True
+            hits.append(hwnd)
+            return False  # stop enumerating
+
+        user32.EnumWindows(EnumWindowsProc(cb), 0)
+        return hits[0] if hits else 0
+
+    deadline = time.monotonic() + _MAX_WAIT_SEC
+    while time.monotonic() < deadline:
+        hwnd = _try_once()
+        if hwnd:
+            user32.ShowWindow(hwnd, _SW_MAXIMIZE)
+            logger.bind(name="app").info(
+                f"maximized PT window for PID {pid} (hwnd 0x{hwnd:x})"
+            )
+            return
+        time.sleep(_POLL_INTERVAL)
+
+    logger.bind(name="app").warning(
+        f"PT window for PID {pid} did not appear within {_MAX_WAIT_SEC}s; skipping maximize"
+    )
+
+
+def _spawn_maximize_thread(pid: int) -> None:
+    if sys.platform != "win32":
+        return
+    threading.Thread(
+        target=_maximize_after_launch,
+        args=(pid,),
+        name=f"pt-maximize-{pid}",
+        daemon=True,
+    ).start()
 
 
 async def launch_pka(lab_id: str, file_path: str | None) -> dict:
@@ -51,13 +117,10 @@ async def launch_pka(lab_id: str, file_path: str | None) -> dict:
             logger.bind(name="app").info(
                 f"replacing tracked PT for {lab_id} (PID {prior.pid})"
             )
-        process = subprocess.Popen(
-            [str(pt), str(pka)],
-            shell=False,
-            startupinfo=_maximized_startupinfo(),
-        )
+        process = subprocess.Popen([str(pt), str(pka)], shell=False)
         _pt_processes[lab_id] = process
         logger.bind(name="app").info(f"Launched {pka.name} with PID {process.pid}")
+        _spawn_maximize_thread(process.pid)
         return {"success": True}
     except FileNotFoundError as e:
         logger.bind(name="app").error(f"File not found: {e}")
