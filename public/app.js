@@ -175,10 +175,11 @@ window.labCard = function(initialLab) {
       this.interval = setInterval(() => this.tickElapsed(), 1000);
     },
 
-    // Skip increment when the card is hidden by category/status filter
-    // (x-show toggles display:none, which makes offsetParent null). Wall-
-    // clock duration on stop still uses sessionStart, so a paused display
-    // doesn't lose any real time — it just stops re-rendering.
+    // Display-only counter. Skips increment when the card is hidden by
+    // filter or page switch (x-show → display:none → offsetParent null)
+    // so we don't burn CPU re-rendering an invisible HH:MM:SS. The saved
+    // duration is computed from sessionStart in stopTimer, NOT from this
+    // counter — pausing the display never loses real time.
     tickElapsed() {
       if (this.$el && this.$el.offsetParent === null) return;
       this.elapsed++;
@@ -202,7 +203,12 @@ window.labCard = function(initialLab) {
       if (!this.running) return;
       clearInterval(this.interval);
       this.running = false;
-      const duration = this.elapsed;
+      // Wall clock, not the (pausable) tick counter — see tickElapsed.
+      // Capped at 8h to match init()'s zombie-session guard so a forgot-
+      // to-stop session doesn't credit absurd hours. Math.max guards
+      // against system-clock skew (NTP correction running backward).
+      const wall = Math.floor((Date.now() - this.sessionStart.getTime()) / 1000);
+      const duration = Math.max(0, Math.min(wall, TIMER_RESUME_CAP_SEC));
       try {
         const json = await api(`/api/labs/${this.lab.id}/timer`, {
           method: "POST",
