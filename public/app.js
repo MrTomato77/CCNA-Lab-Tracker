@@ -175,14 +175,15 @@ window.labCard = function(initialLab) {
       this.interval = setInterval(() => this.tickElapsed(), 1000);
     },
 
-    // Display-only counter. Skips increment when the card is hidden by
-    // filter or page switch (x-show → display:none → offsetParent null)
-    // so we don't burn CPU re-rendering an invisible HH:MM:SS. The saved
-    // duration is computed from sessionStart in stopTimer, NOT from this
-    // counter — pausing the display never loses real time.
+    // Display value, recomputed from sessionStart so the on-card timer
+    // always matches what stopTimer will save. Skipped while the card is
+    // hidden by filter or page switch (x-show → display:none →
+    // offsetParent null) — no DOM update for an invisible HH:MM:SS — but
+    // the next tick after the card becomes visible snaps elapsed back to
+    // the true wall clock. No drift, no surprise.
     tickElapsed() {
       if (this.$el && this.$el.offsetParent === null) return;
-      this.elapsed++;
+      this.elapsed = Math.floor((Date.now() - this.sessionStart.getTime()) / 1000);
     },
 
     async startTimer() {
