@@ -92,6 +92,24 @@ window.appShell = function() {
     async init() {
       await this.fetchLabs();
       window.addEventListener("refresh-labs", () => this.fetchLabs());
+      // Lightweight per-status sync so categoryDone() reflects just-
+      // stopped labs without a full /api/labs refetch. labCard owns
+      // its own spread copy of the lab object, so without this patch
+      // the appShell's labs[] would lag behind until next page load.
+      window.addEventListener("lab-status-changed", (e) => {
+        const row = this.labs.find(l => l.id === e.detail.id);
+        if (row) row.status = e.detail.status;
+      });
+    },
+
+    // True when the category has >= 1 lab and every one of them is
+    // done. Used by the filter chip class binding to turn the chip
+    // green at-a-glance. Pass empty string for "All" → returns false
+    // (the All chip handles its own all-done check inline).
+    categoryDone(cat) {
+      if (!cat) return false;
+      const rows = this.labs.filter(l => l.category === cat);
+      return rows.length > 0 && rows.every(l => l.status === STATUS.DONE);
     },
 
     toggleTheme() {
@@ -260,6 +278,8 @@ window.labCard = function(initialLab) {
           this.lab.status = STATUS.NOT_STARTED;
           this.lab.time_spent = 0;
           this.resetTimer();
+          window.dispatchEvent(new CustomEvent("lab-status-changed",
+            { detail: { id: this.lab.id, status: STATUS.NOT_STARTED } }));
           await Alpine.store("app").refreshSummary();
           window.showToast("+ Lab reset successful", 'success');
         }
@@ -278,6 +298,8 @@ window.labCard = function(initialLab) {
         if (newStatus) {
           this.lab.status = newStatus;
         }
+        window.dispatchEvent(new CustomEvent("lab-status-changed",
+          { detail: { id: this.lab.id, status } }));
         await Alpine.store("app").refreshSummary();
       } catch (e) {
         console.error("Status update failed:", e);

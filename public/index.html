@@ -92,9 +92,14 @@
                 @click="hideStatus = 'undone'; statusOpen = false; $refs.statusTrigger.focus()">Hide not done</button>
             </div>
           </div>
-          <button class="filter-chip" @click="filterCat=''" :class="{active:filterCat===''}">All</button>
+          <button class="filter-chip"
+            :class="{ active: filterCat==='', 'filter-chip--done': labs.length > 0 && labs.every(l => l.status === 'done') }"
+            @click="filterCat=''">All</button>
           <template x-for="cat in categories" :key="cat">
-            <button class="filter-chip" @click="filterCat=cat" :class="{active:filterCat===cat}" x-text="cat"></button>
+            <button class="filter-chip"
+              :class="{ active: filterCat===cat, 'filter-chip--done': categoryDone(cat) }"
+              @click="filterCat=cat"
+              x-text="cat"></button>
           </template>
         </div>
 

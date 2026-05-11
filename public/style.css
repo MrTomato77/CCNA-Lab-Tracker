@@ -328,6 +328,27 @@ a { color: inherit; text-decoration: none; }
   border-color: var(--accent-tint);
   font-weight: 600;
 }
+/* All labs in this category are done — glance signal that the
+   category is complete. Reuses the same --done* tokens as
+   .lab-card--done so light/dark theming carries over automatically. */
+.filter-chip--done {
+  background:    var(--done-tint);
+  color:         var(--done);
+  border-color:  var(--done-border);
+}
+.filter-chip--done:hover {
+  background:    var(--done-tint);
+  color:         var(--done);
+  border-color:  var(--done);
+}
+/* When a done chip is also the selected filter, switch to solid
+   green so the active-state ring still reads. The plain `.active`
+   rule above would otherwise replace the green entirely. */
+.filter-chip--done.active {
+  background:    var(--done);
+  color:         #fff;
+  border-color:  var(--done);
+}
 
 .status-select {
   position: relative;
