@@ -23,7 +23,7 @@ _pt_processes: dict[str, subprocess.Popen] = {}
 # main window is visible.
 _SW_MAXIMIZE   = 3
 _GW_OWNER      = 4
-_MAX_WAIT_SEC  = 30.0
+_MAX_WAIT_SEC  = 60.0
 _POLL_INTERVAL = 0.2
 
 
