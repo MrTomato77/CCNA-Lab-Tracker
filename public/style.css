@@ -341,13 +341,15 @@ a { color: inherit; text-decoration: none; }
   color:         var(--done);
   border-color:  var(--done);
 }
-/* When a done chip is also the selected filter, switch to solid
-   green so the active-state ring still reads. The plain `.active`
-   rule above would otherwise replace the green entirely. */
+/* Match the .filter-chip.active recipe — soft tinted fill + bold
+   text. Active state reads through font weight and a border that
+   merges into the bg, instead of a saturated fill that looked too
+   heavy in light mode and too bright in dark. */
 .filter-chip--done.active {
-  background:    var(--done);
-  color:         #fff;
-  border-color:  var(--done);
+  background:    var(--done-tint);
+  color:         var(--done);
+  border-color:  var(--done-tint);
+  font-weight:   600;
 }
 
 .status-select {
