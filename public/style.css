@@ -708,6 +708,25 @@ a { color: inherit; text-decoration: none; }
   overflow-y: auto;
   overflow-x: hidden;
   margin: 12px 0;
+  /* Subtle scrollbar that matches the theme. Firefox honors the
+     two scrollbar-* properties; Chromium/WebKit honor the pseudo-
+     elements below. Both render a thin, rounded thumb on a
+     transparent track — no chunky OS scrollbar in the modal. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+.summary-body::-webkit-scrollbar {
+  width: 8px;
+}
+.summary-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.summary-body::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 4px;
+}
+.summary-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-4);
 }
 .summary-body section {
   margin: 0;
@@ -736,9 +755,11 @@ a { color: inherit; text-decoration: none; }
   font-size: 13px;
 }
 
-/* Docstring-style cmd row: pill on its own line, note indented below.
-   Reads as "command + its explanation" pair instead of two stranded
-   items wrapped onto separate rows by flex-wrap. */
+/* Inline cmd + note: pill and note flow on the same line when the
+   note fits; when the pill consumes the row width, the note text
+   wraps naturally to the next line inside the same <li>. No flex,
+   so the previous "stranded note at row start" disconnect can't
+   recur. */
 .cmd-list, .gotcha-list {
   list-style: none;
   margin: 0;
@@ -746,7 +767,8 @@ a { color: inherit; text-decoration: none; }
 }
 .cmd-list li {
   display: block;
-  padding: 8px 0;
+  padding: 6px 0;
+  line-height: 1.75;
 }
 .cmd-list code {
   display: inline-block;
@@ -755,18 +777,16 @@ a { color: inherit; text-decoration: none; }
   font-size: 12px;
   background: var(--surface-2);
   color: var(--accent-text);
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 4px;
-  line-height: 1.6;
+  vertical-align: baseline;
   white-space: normal;
   overflow-wrap: break-word;
 }
 .cmd-note {
-  display: block;
-  margin: 4px 0 0 12px;
+  margin-left: 8px;
   color: var(--text-3);
   font-size: 12px;
-  line-height: 1.5;
 }
 
 .gotcha-list li {
