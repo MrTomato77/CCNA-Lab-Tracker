@@ -701,8 +701,44 @@ a { color: inherit; text-decoration: none; }
    overflow-x:hidden + overflow-wrap on the cmd pill ensures long
    commands wrap inside the modal instead of triggering h-scroll. */
 /* Compound selector raises specificity over the base .modal rule
-   (which sets max-width: 400px further down in this file). */
-.modal.summary-modal { max-width: 720px; width: 92vw; }
+   (which sets max-width: 400px further down in this file).
+   position:relative gives the absolute-positioned close button an
+   anchor at the top-right corner. */
+.modal.summary-modal {
+  max-width: 720px;
+  width: 92vw;
+  position: relative;
+}
+
+/* X close button in the top-right corner. Replaces the bottom
+   "Close" button — Esc and backdrop click still close the modal too. */
+.btn-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-3);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-modal-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.btn-modal-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .summary-body {
   max-height: 60vh;
   overflow-y: auto;

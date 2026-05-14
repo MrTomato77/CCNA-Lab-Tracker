@@ -323,6 +323,8 @@
     @click="$store.summaryModal.close()"
     @keydown.escape.window="$store.summaryModal.close()">
     <div class="modal summary-modal" @click.stop>
+      <button class="btn-modal-close" type="button" aria-label="Close"
+        @click="$store.summaryModal.close()">×</button>
       <div class="modal-title">
         <span x-text="$store.summaryModal.lab?.id"></span>
         ·
@@ -380,9 +382,6 @@
         </div>
       </template>
 
-      <div class="modal-actions">
-        <button class="modal-btn modal-btn--cancel" @click="$store.summaryModal.close()">Close</button>
-      </div>
     </div>
   </div>
 
