@@ -144,25 +144,28 @@
                   x-show="lab.status === 'done'">↻</button>
                 <div class="lab-timer" x-text="formatTime(elapsed || lab.time_spent || 0)"></div>
               </div>
-              <!-- Col 3: action buttons -->
+              <!-- Col 3: secondary actions on the left, primary CTA (Launch)
+                   rightmost so the most-used button anchors the card edge.
+                   Glyphs are inline SVG (Lucide-style, currentColor-stroked)
+                   so they render crisp at any zoom and inherit text colour. -->
               <div class="lab-col-actions">
-                <button class="btn-action"
-                  :class="running ? 'btn-action--stop' : lab.status === 'done' ? 'btn-action--done' : 'btn-action--launch'"
-                  :disabled="!running && !lab.file_path"
-                  :title="running ? 'Stop timer' : lab.file_path ? 'Open in Packet Tracer' : 'Import this lab first'"
-                  @click="running ? stopTimer() : launch()"
-                  x-text="running ? '■ Stop' : lab.status === 'done' ? '✓ Done' : lab.file_path ? 'Launch →' : '— —'">
-                </button>
                 <button class="btn-brief"
                   @click="openBrief()"
                   title="Quick reference: summary and key commands">
-                  Brief
+                  Brief<svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
                 </button>
                 <button class="btn-docs"
                   @click="openDocs()"
                   :disabled="!lab.docs_path"
                   :title="lab.docs_path ? 'Open lab documentation' : 'Docs not generated yet — run scripts/split_pdf.py'">
-                  Docs ›
+                  Docs<svg class="btn-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </button>
+                <button class="btn-action"
+                  :class="running ? 'btn-action--stop' : lab.status === 'done' ? 'btn-action--done' : 'btn-action--launch'"
+                  :disabled="!running && !lab.file_path"
+                  :title="running ? 'Stop timer' : lab.file_path ? 'Open in Packet Tracer' : 'Import this lab first'"
+                  @click="running ? stopTimer() : launch()"
+                  x-text="running ? 'Stop ■' : lab.status === 'done' ? 'Done ✓' : lab.file_path ? 'Launch →' : '— —'">
                 </button>
               </div>
             </article>
