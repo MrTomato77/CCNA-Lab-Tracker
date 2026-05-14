@@ -596,6 +596,17 @@ a { color: inherit; text-decoration: none; }
   opacity: 0.72;
 }
 
+/* Vertical divider between secondary buttons (Brief, Docs) and the
+   primary CTA (Launch / Stop / Done). Mirrors the divider between
+   the timer column and the action column, reinforcing the
+   "primary action stands apart" hierarchy. */
+.action-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border);
+  margin: 4px 4px;
+}
+
 /* ── Status pill ──────────────────────────────────────────────────────── */
 
 .status-pill {
