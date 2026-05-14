@@ -697,64 +697,93 @@ a { color: inherit; text-decoration: none; }
   border-color: var(--accent-tint);
 }
 
-/* Summary modal — wider than the confirm modal, scrollable body. */
-.summary-modal { max-width: 560px; width: 90vw; }
-.summary-body { max-height: 60vh; overflow-y: auto; margin: 12px 0; }
-.summary-body section { margin: 18px 0; }
-.summary-body section:first-child { margin-top: 0; }
+/* Summary modal — wider than the confirm modal, scrollable body.
+   overflow-x:hidden + overflow-wrap on the cmd pill ensures long
+   commands wrap inside the modal instead of triggering h-scroll. */
+/* Compound selector raises specificity over the base .modal rule
+   (which sets max-width: 400px further down in this file). */
+.modal.summary-modal { max-width: 720px; width: 92vw; }
+.summary-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 12px 0;
+}
+.summary-body section {
+  margin: 0;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+}
+/* Alpine <template> elements sit between sections in the DOM, so
+   :first-child never matches. Use :first-of-type so the topmost
+   visible section drops its divider. */
+.summary-body section:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
 .summary-body h4 {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-3);
-  margin: 0 0 8px;
+  margin: 0 0 10px;
   font-weight: 600;
 }
 .summary-body p {
   margin: 0;
   color: var(--text-2);
-  line-height: 1.55;
+  line-height: 1.6;
   font-size: 13px;
 }
+
+/* Docstring-style cmd row: pill on its own line, note indented below.
+   Reads as "command + its explanation" pair instead of two stranded
+   items wrapped onto separate rows by flex-wrap. */
 .cmd-list, .gotcha-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 .cmd-list li {
-  display: flex;
-  gap: 10px;
-  padding: 4px 0;
-  font-size: 12px;
-  align-items: baseline;
-  flex-wrap: wrap;
+  display: block;
+  padding: 8px 0;
 }
 .cmd-list code {
+  display: inline-block;
+  max-width: 100%;
   font-family: "JetBrains Mono", monospace;
-  background: var(--surface-2);
-  padding: 2px 8px;
-  border-radius: 4px;
-  color: var(--accent-text);
-  flex-shrink: 0;
   font-size: 12px;
+  background: var(--surface-2);
+  color: var(--accent-text);
+  padding: 4px 10px;
+  border-radius: 4px;
+  line-height: 1.6;
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 .cmd-note {
+  display: block;
+  margin: 4px 0 0 12px;
   color: var(--text-3);
   font-size: 12px;
+  line-height: 1.5;
 }
+
 .gotcha-list li {
   position: relative;
-  padding-left: 18px;
-  margin: 6px 0;
+  padding-left: 20px;
+  margin: 8px 0;
   color: var(--text-2);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 .gotcha-list li::before {
   content: "!";
   position: absolute;
   left: 0;
   top: 0;
+  width: 14px;
+  text-align: center;
   color: var(--in-progress);
   font-weight: 700;
 }
