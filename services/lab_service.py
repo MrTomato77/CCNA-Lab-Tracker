@@ -1,3 +1,5 @@
+import json
+
 import aiosqlite
 from core.constants import STATUS_NOT_STARTED
 from database.connection import get_db
@@ -96,3 +98,28 @@ async def list_with_paths() -> list[dict]:
         "SELECT id, name, category, file_path, docs_path FROM labs ORDER BY id"
     ) as cur:
         return [dict(r) for r in await cur.fetchall()]
+
+
+async def read_summary(lab_id: str) -> dict | None:
+    """Return cheat-sheet dict for the lab. Returns None when the lab
+    has no summary content at all (all 4 columns NULL); otherwise omits
+    any individual NULL field from the dict so the frontend renders
+    only populated sections."""
+    db = await get_db()
+    async with db.execute(
+        "SELECT summary, core_commands, verify_commands, gotchas FROM labs WHERE id = ?",
+        (lab_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    if not row:
+        return None
+    out: dict = {}
+    if row["summary"]:
+        out["summary"] = row["summary"]
+    if row["core_commands"]:
+        out["core_commands"] = json.loads(row["core_commands"])
+    if row["verify_commands"]:
+        out["verify_commands"] = json.loads(row["verify_commands"])
+    if row["gotchas"]:
+        out["gotchas"] = json.loads(row["gotchas"])
+    return out or None

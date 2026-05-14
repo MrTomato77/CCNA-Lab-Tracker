@@ -114,7 +114,7 @@ input, select, textarea { font-family: inherit; color: inherit; }
 a { color: inherit; text-decoration: none; }
 
 /* All interactive surfaces — smooth transitions */
-.lab-card, .filter-chip, .nav-tab, .btn-action, .btn-docs,
+.lab-card, .filter-chip, .nav-tab, .btn-action, .btn-docs, .btn-brief,
 .btn-card-reset, .btn-primary, .theme-toggle, .nav-reset,
 .status-filter, .status-option, .folder-input, .stat-card {
   transition: all 160ms ease;
@@ -678,6 +678,86 @@ a { color: inherit; text-decoration: none; }
 }
 .btn-docs:hover { color: var(--accent); background: var(--accent-tint); }
 .btn-docs:disabled { color: var(--text-4); cursor: not-allowed; background: transparent; }
+
+/* Brief — sibling of btn-docs; faint border distinguishes it from
+   the borderless docs link without competing visually. */
+.btn-brief {
+  color: var(--text-2);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.btn-brief:hover {
+  color: var(--accent);
+  background: var(--accent-tint);
+  border-color: var(--accent-tint);
+}
+
+/* Summary modal — wider than the confirm modal, scrollable body. */
+.summary-modal { max-width: 560px; width: 90vw; }
+.summary-body { max-height: 60vh; overflow-y: auto; margin: 12px 0; }
+.summary-body section { margin: 18px 0; }
+.summary-body section:first-child { margin-top: 0; }
+.summary-body h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  margin: 0 0 8px;
+  font-weight: 600;
+}
+.summary-body p {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.55;
+  font-size: 13px;
+}
+.cmd-list, .gotcha-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cmd-list li {
+  display: flex;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 12px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.cmd-list code {
+  font-family: "JetBrains Mono", monospace;
+  background: var(--surface-2);
+  padding: 2px 8px;
+  border-radius: 4px;
+  color: var(--accent-text);
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.cmd-note {
+  color: var(--text-3);
+  font-size: 12px;
+}
+.gotcha-list li {
+  position: relative;
+  padding-left: 18px;
+  margin: 6px 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.gotcha-list li::before {
+  content: "!";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--in-progress);
+  font-weight: 700;
+}
 
 .btn-card-reset {
   width: 28px; height: 28px;

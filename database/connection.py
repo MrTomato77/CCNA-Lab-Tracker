@@ -38,6 +38,10 @@ async def init_db():
     await _add_column_if_missing(_db, "labs", "docs_path",         "TEXT DEFAULT NULL")
     await _add_column_if_missing(_db, "labs", "difficulty",        "INTEGER DEFAULT NULL")
     await _add_column_if_missing(_db, "labs", "estimated_minutes", "INTEGER DEFAULT NULL")
+    await _add_column_if_missing(_db, "labs", "summary",           "TEXT DEFAULT NULL")
+    await _add_column_if_missing(_db, "labs", "core_commands",     "TEXT DEFAULT NULL")
+    await _add_column_if_missing(_db, "labs", "verify_commands",   "TEXT DEFAULT NULL")
+    await _add_column_if_missing(_db, "labs", "gotchas",           "TEXT DEFAULT NULL")
     # Zombie-session cleanup: if the last run crashed mid-timer, an attempts
     # row with duration IS NULL would "resume" on next load as a multi-day
     # timer and add bogus hours to time_spent. Delete stale open sessions —

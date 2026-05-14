@@ -73,6 +73,38 @@ document.addEventListener("alpine:init", () => {
     ok()     { if (this.resolve) this.resolve(true);  this.open = false; },
     cancel() { if (this.resolve) this.resolve(false); this.open = false; }
   });
+
+  // Cheat-sheet popup. Separate from the confirm modal above because the
+  // body is structured content (4 optional sections), not a single message.
+  Alpine.store("summaryModal", {
+    open: false,
+    lab: null,
+    data: null,
+    loading: false,
+    error: null,
+    async show(lab) {
+      this.lab = { id: lab.id, name: lab.name };
+      this.data = null;
+      this.error = null;
+      this.loading = true;
+      this.open = true;
+      try {
+        const res = await api(`/api/labs/${lab.id}/summary`);
+        if (res.success) {
+          this.data = res.data;
+        } else {
+          this.error = res.code === "SUMMARY_MISSING"
+            ? "No cheat-sheet for this lab yet."
+            : (res.error || "Failed to load");
+        }
+      } catch (e) {
+        this.error = "Network error";
+      } finally {
+        this.loading = false;
+      }
+    },
+    close() { this.open = false; this.data = null; this.error = null; }
+  });
 });
 
 // ── App Shell ─────────────────────────────────────────────────────────────
@@ -313,6 +345,10 @@ window.labCard = function(initialLab) {
         return;
       }
       window.open(`/docs/${this.lab.id}.pdf`, '_blank');
+    },
+
+    openBrief() {
+      Alpine.store("summaryModal").show(this.lab);
     },
 
     async launch() {

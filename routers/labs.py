@@ -1,6 +1,6 @@
 from robyn import Request, SubRouter
 from core.responses import err
-from services.lab_service import get_all_labs, get_lab_by_id, reset_all_labs
+from services.lab_service import get_all_labs, get_lab_by_id, read_summary, reset_all_labs
 
 router = SubRouter(__name__, prefix="/api/labs")
 
@@ -8,6 +8,19 @@ router = SubRouter(__name__, prefix="/api/labs")
 async def all_labs(request: Request):
     labs = await get_all_labs()
     return {"success": True, "data": labs}
+
+# Register the more-specific /:lab_id/summary route BEFORE the catch-all
+# /:lab_id so it doesn't get swallowed.
+@router.get("/:lab_id/summary")
+async def lab_summary(request: Request):
+    lab_id = request.path_params.get("lab_id")
+    if not await get_lab_by_id(lab_id):
+        return err({"success": False, "error": f"Lab {lab_id} not found.", "code": "LAB_NOT_FOUND"}, 404)
+    data = await read_summary(lab_id)
+    if data is None:
+        return err({"success": False, "error": "Summary not authored yet.",
+                    "code": "SUMMARY_MISSING"}, 404)
+    return {"success": True, "data": data}
 
 @router.get("/:lab_id")
 async def single_lab(request: Request):
