@@ -55,16 +55,23 @@ LAB_DEFINITIONS = [
     ("LAB-51", "Network Controller",                             "Security & Advanced"),
 ]
 
-async def seed_labs(db: aiosqlite.Connection):
-    logger.info(f"Seeding {len(LAB_DEFINITIONS)} labs (metadata only — file_path stays NULL until import)...")
-    for lab_id, name, category in LAB_DEFINITIONS:
-        await db.execute(
-            "INSERT OR IGNORE INTO labs (id, name, category) VALUES (?,?,?)",
-            (lab_id, name, category)
-        )
-        await db.execute(
-            "INSERT OR IGNORE INTO progress (lab_id) VALUES (?)",
-            (lab_id,)
-        )
-    await db.commit()
-    logger.success(f"Seeded {len(LAB_DEFINITIONS)} labs.")
+async def seed_labs(db: aiosqlite.Connection) -> None:
+    logger.bind(name="db").info(
+        f"Seeding {len(LAB_DEFINITIONS)} labs (metadata only - file_path stays NULL until import)..."
+    )
+    try:
+        for lab_id, name, category in LAB_DEFINITIONS:
+            await db.execute(
+                "INSERT OR IGNORE INTO labs (id, name, category) VALUES (?,?,?)",
+                (lab_id, name, category)
+            )
+            await db.execute(
+                "INSERT OR IGNORE INTO progress (lab_id) VALUES (?)",
+                (lab_id,)
+            )
+        await db.commit()
+        logger.bind(name="db").success(f"Seeded {len(LAB_DEFINITIONS)} labs.")
+    except Exception:
+        await db.rollback()
+        logger.bind(name="db").exception("seed_labs failed; rolled back")
+        raise
