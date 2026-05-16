@@ -567,10 +567,3 @@ window.showToast = function(message, type = 'info', duration = 1800) {
     setTimeout(() => toast.remove(), 220);
   }, duration);
 };
-
-// Disable Alpine auto-start and start it manually (deferLoadingAlpine helper)
-window.deferLoadingAlpine = function (callback) {
-  window.addEventListener('DOMContentLoaded', () => {
-    callback();
-  });
-};

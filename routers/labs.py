@@ -1,7 +1,7 @@
 from robyn import Request, SubRouter
 from loguru import logger
-from core.responses import ErrorResponse, api_error, internal_error, lab_not_found, ok
-from services.lab_service import get_all_labs, get_lab_by_id, read_summary, reset_all_labs
+from core.responses import ErrorResponse, api_error, internal_error, ok
+from services.lab_service import get_all_labs, read_summary, require_lab, reset_all_labs
 
 router = SubRouter(__name__, prefix="/api/labs")
 
@@ -15,8 +15,9 @@ async def all_labs(request: Request) -> dict:
 @router.get("/:lab_id/summary")
 async def lab_summary(request: Request) -> dict | ErrorResponse:
     lab_id = request.path_params.get("lab_id")
-    if not await get_lab_by_id(lab_id):
-        return lab_not_found(lab_id)
+    _, err_resp = await require_lab(lab_id)
+    if err_resp:
+        return err_resp
     data = await read_summary(lab_id)
     if data is None:
         return api_error("Summary not authored yet.", "SUMMARY_MISSING", 404)
@@ -25,9 +26,9 @@ async def lab_summary(request: Request) -> dict | ErrorResponse:
 @router.get("/:lab_id")
 async def single_lab(request: Request) -> dict | ErrorResponse:
     lab_id = request.path_params.get("lab_id")
-    lab = await get_lab_by_id(lab_id)
-    if not lab:
-        return lab_not_found(lab_id)
+    lab, err_resp = await require_lab(lab_id)
+    if err_resp:
+        return err_resp
     return ok(lab)
 
 @router.post("/reset")

@@ -2,6 +2,7 @@ import json
 
 import aiosqlite
 from core.constants import STATUS_NOT_STARTED
+from core.responses import ErrorResponse, lab_not_found
 from database.connection import get_db
 from loguru import logger
 
@@ -138,3 +139,14 @@ async def read_summary(lab_id: str) -> dict | None:
     if gotchas is not None:
         out["gotchas"] = gotchas
     return out or None
+
+
+async def require_lab(lab_id: str | None) -> tuple[dict | None, ErrorResponse | None]:
+    """Lookup helper for routers: returns (lab, None) when found, or
+    (None, lab_not_found_response) when missing. Centralizes the
+    `if not await get_lab_by_id(lab_id): return lab_not_found(lab_id)`
+    pattern that was duplicated across 6 route handlers."""
+    lab = await get_lab_by_id(lab_id)
+    if not lab:
+        return None, lab_not_found(lab_id)
+    return lab, None
