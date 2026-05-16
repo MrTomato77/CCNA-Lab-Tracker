@@ -20,7 +20,7 @@ async def _add_column_if_missing(
 ) -> None:
     """PRAGMA-driven additive migration. The previous try/except-OperationalError
     pattern swallowed real failures (locked DB, disk full, schema corruption)
-    as if they were "duplicate column" — leaving the app running on a half-
+    as if they were "duplicate column" -- leaving the app running on a half-
     migrated schema. Pre-checking the column list lets real errors propagate."""
     if table not in _ALLOWED_MIGRATION_TABLES or not col.isidentifier():
         raise ValueError(f"Unexpected table/col: {table!r}.{col!r}")
@@ -30,12 +30,66 @@ async def _add_column_if_missing(
         await db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
         logger.bind(name="db").info(f"migration: added {table}.{col}")
 
+
 async def get_db() -> aiosqlite.Connection:
     """Return the initialized application database connection."""
     global _db
     if _db is None:
         raise RuntimeError("DB not initialized. Call init_db() first via startup_handler.")
     return _db
+
+
+async def _run_schema_migrations(db: aiosqlite.Connection) -> None:
+    await db.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    # Idempotent additive migrations. CREATE TABLE IF NOT EXISTS won't add
+    # columns to an existing table, so check via PRAGMA table_info and only
+    # ALTER when the column is absent. Real errors propagate.
+    await _add_column_if_missing(db, "labs", "docs_path",         "TEXT DEFAULT NULL")
+    await _add_column_if_missing(db, "labs", "difficulty",        "INTEGER DEFAULT NULL")
+    await _add_column_if_missing(db, "labs", "estimated_minutes", "INTEGER DEFAULT NULL")
+    await _add_column_if_missing(db, "labs", "summary",           "TEXT DEFAULT NULL")
+    await _add_column_if_missing(db, "labs", "core_commands",     "TEXT DEFAULT NULL")
+    await _add_column_if_missing(db, "labs", "verify_commands",   "TEXT DEFAULT NULL")
+    await _add_column_if_missing(db, "labs", "gotchas",           "TEXT DEFAULT NULL")
+
+
+async def _cleanup_stale_attempts(db: aiosqlite.Connection) -> None:
+    # Zombie-session cleanup: if the last run crashed mid-timer, an attempts
+    # row with duration IS NULL would "resume" on next load as a multi-day
+    # timer and add bogus hours to time_spent. Delete stale open sessions; we
+    # can't verify their duration, so don't credit any time.
+    await db.execute("DELETE FROM attempts WHERE duration IS NULL")
+
+
+async def _seed_if_empty(db: aiosqlite.Connection) -> None:
+    async with db.execute("SELECT COUNT(*) FROM labs") as cur:
+        if (await cur.fetchone())[0] == 0:
+            from database.seed import seed_labs
+            await seed_labs(db)
+
+
+async def _sync_asset_paths(db: aiosqlite.Connection) -> None:
+    # Auto-detect per-lab PDFs in docs/ and .pka files in labs/. Lets the
+    # user run scripts/split_pdf.py / drop new files in either folder and
+    # have docs_path / file_path populated on next restart without a
+    # separate import step. Also self-heals if either folder gets renamed.
+    project_root = Path(__file__).parent.parent
+    docs_dir = project_root / "docs"
+    labs_dir = project_root / "labs"
+    async with db.execute("SELECT id FROM labs") as cur:
+        lab_ids = [r["id"] for r in await cur.fetchall()]
+    for lab_id in lab_ids:
+        pdf = docs_dir / f"{lab_id}.pdf"
+        pka = labs_dir / f"{lab_id}.pka"
+        await db.execute(
+            "UPDATE labs SET docs_path=?, file_path=? WHERE id=?",
+            (
+                str(pdf) if pdf.exists() else None,
+                str(pka) if pka.exists() else None,
+                lab_id,
+            ),
+        )
+
 
 async def init_db() -> None:
     """Initialize the process-wide SQLite connection and run migrations."""
@@ -47,48 +101,13 @@ async def init_db() -> None:
         _db.row_factory = aiosqlite.Row   # access columns as row["name"]
         await _db.execute("PRAGMA journal_mode=WAL")
         await _db.execute("PRAGMA foreign_keys=ON")
-        await _db.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-        # Idempotent additive migrations. CREATE TABLE IF NOT EXISTS won't add
-        # columns to an existing table, so check via PRAGMA table_info and only
-        # ALTER when the column is absent. Real errors propagate.
-        await _add_column_if_missing(_db, "labs", "docs_path",         "TEXT DEFAULT NULL")
-        await _add_column_if_missing(_db, "labs", "difficulty",        "INTEGER DEFAULT NULL")
-        await _add_column_if_missing(_db, "labs", "estimated_minutes", "INTEGER DEFAULT NULL")
-        await _add_column_if_missing(_db, "labs", "summary",           "TEXT DEFAULT NULL")
-        await _add_column_if_missing(_db, "labs", "core_commands",     "TEXT DEFAULT NULL")
-        await _add_column_if_missing(_db, "labs", "verify_commands",   "TEXT DEFAULT NULL")
-        await _add_column_if_missing(_db, "labs", "gotchas",           "TEXT DEFAULT NULL")
-        # Zombie-session cleanup: if the last run crashed mid-timer, an attempts
-        # row with duration IS NULL would "resume" on next load as a multi-day
-        # timer and add bogus hours to time_spent. Delete stale open sessions —
-        # we can't verify their duration, so don't credit any time.
-        await _db.execute("DELETE FROM attempts WHERE duration IS NULL")
+        await _run_schema_migrations(_db)
+        await _cleanup_stale_attempts(_db)
         await _db.commit()
-        async with _db.execute("SELECT COUNT(*) FROM labs") as cur:
-            if (await cur.fetchone())[0] == 0:
-                from database.seed import seed_labs
-                await seed_labs(_db)
-        # Auto-detect per-lab PDFs in docs/ and .pka files in labs/. Lets the
-        # user run scripts/split_pdf.py / drop new files in either folder and
-        # have docs_path / file_path populated on next restart without a
-        # separate import step. Also self-heals if either folder gets renamed.
-        project_root = Path(__file__).parent.parent
-        docs_dir = project_root / "docs"
-        labs_dir = project_root / "labs"
-        async with _db.execute("SELECT id FROM labs") as cur:
-            lab_ids = [r["id"] for r in await cur.fetchall()]
-        for lab_id in lab_ids:
-            pdf = docs_dir / f"{lab_id}.pdf"
-            pka = labs_dir / f"{lab_id}.pka"
-            await _db.execute(
-                "UPDATE labs SET docs_path=?, file_path=? WHERE id=?",
-                (
-                    str(pdf) if pdf.exists() else None,
-                    str(pka) if pka.exists() else None,
-                    lab_id,
-                ),
-            )
+        await _seed_if_empty(_db)
+        await _sync_asset_paths(_db)
         await _db.commit()
+
 
 async def close_db() -> None:
     """Close the process-wide SQLite connection if it is open."""
