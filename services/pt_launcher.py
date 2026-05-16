@@ -1,6 +1,7 @@
 import ctypes
 import os
-import subprocess
+# Packet Tracer launch is this module's core job; calls below use shell=False.
+import subprocess  # nosec B404
 import sys
 import threading
 import time
@@ -15,6 +16,7 @@ PT_EXE = os.getenv("PACKET_TRACER_EXE", r"C:\Program Files\Cisco Packet Tracer\P
 # instances become orphaned and the user closes them manually. The dict
 # is a convenience for the /close route, not a source of truth.
 _pt_processes: dict[str, subprocess.Popen] = {}
+_pt_lock = threading.Lock()
 
 
 # Win32 constants for the post-launch maximize. PT is a Qt app and Qt
@@ -25,6 +27,12 @@ _SW_MAXIMIZE   = 3
 _GW_OWNER      = 4
 _MAX_WAIT_SEC  = 60.0
 _POLL_INTERVAL = 0.2
+
+
+def _drop_exited_locked() -> None:
+    for tracked_lab_id, process in list(_pt_processes.items()):
+        if process.poll() is not None:
+            _pt_processes.pop(tracked_lab_id, None)
 
 
 def _maximize_after_launch(pid: int) -> None:
@@ -112,13 +120,17 @@ async def launch_pka(lab_id: str, file_path: str | None) -> dict:
     try:
         # Replace any prior tracked instance for this lab — relaunching
         # without stopping should not leak the old handle.
-        prior = _pt_processes.pop(lab_id, None)
+        with _pt_lock:
+            _drop_exited_locked()
+            prior = _pt_processes.pop(lab_id, None)
         if prior and prior.poll() is None:
             logger.bind(name="app").info(
                 f"replacing tracked PT for {lab_id} (PID {prior.pid})"
             )
-        process = subprocess.Popen([str(pt), str(pka)], shell=False)
-        _pt_processes[lab_id] = process
+        process = subprocess.Popen([str(pt), str(pka)], shell=False)  # nosec B603
+        with _pt_lock:
+            _drop_exited_locked()
+            _pt_processes[lab_id] = process
         logger.bind(name="app").info(f"Launched {pka.name} with PID {process.pid}")
         _spawn_maximize_thread(process.pid)
         return {"success": True}
@@ -129,9 +141,10 @@ async def launch_pka(lab_id: str, file_path: str | None) -> dict:
         logger.bind(name="app").error(f"Permission denied: {e}")
         return {"success": False, "error": "Permission denied launching Packet Tracer.",
                 "code": "PT_PERMISSION_ERROR"}
-    except Exception as e:
-        logger.bind(name="app").error(f"Launch error: {e}")
-        return {"success": False, "error": str(e), "code": "PT_UNKNOWN_ERROR"}
+    except Exception:
+        logger.bind(name="app").exception("Unexpected Packet Tracer launch error")
+        return {"success": False, "error": "An internal error occurred.",
+                "code": "PT_UNKNOWN_ERROR"}
 
 
 def terminate_pt(lab_id: str) -> dict:
@@ -139,7 +152,9 @@ def terminate_pt(lab_id: str) -> dict:
     to show its 'Save changes?' dialog. Idempotent: if the process already
     exited or was never tracked, returns success with a code so the
     caller can log/ignore."""
-    process = _pt_processes.pop(lab_id, None)
+    with _pt_lock:
+        _drop_exited_locked()
+        process = _pt_processes.pop(lab_id, None)
     if process is None:
         return {"success": True, "code": "NO_PROCESS"}
     if process.poll() is not None:
@@ -150,6 +165,7 @@ def terminate_pt(lab_id: str) -> dict:
         process.terminate()
         logger.bind(name="app").info(f"terminated PT for {lab_id} (PID {process.pid})")
         return {"success": True, "code": "TERMINATED"}
-    except Exception as e:
-        logger.bind(name="app").error(f"PT terminate failed: {e}")
-        return {"success": False, "error": str(e), "code": "TERMINATE_FAILED"}
+    except Exception:
+        logger.bind(name="app").exception("Unexpected Packet Tracer terminate error")
+        return {"success": False, "error": "An internal error occurred.",
+                "code": "TERMINATE_FAILED"}

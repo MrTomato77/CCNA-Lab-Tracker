@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 from robyn import Request, SubRouter
-from core.responses import err
+from core.responses import ErrorResponse, err
 from services.lab_service import get_file_path, get_lab_by_id, update_last_opened
 from services.pt_launcher import launch_pka, terminate_pt
 
 router = SubRouter(__name__, prefix="/api/labs")
 
 @router.post("/:lab_id/open")
-async def open_lab(request: Request):
+async def open_lab(request: Request) -> dict | ErrorResponse:
     lab_id = request.path_params.get("lab_id")
     # Verify the lab id exists before falling through to launch_pka — a
     # bogus id like "LAB-99" used to surface as `NO_FILE_IMPORTED` (400),
@@ -27,7 +27,7 @@ async def open_lab(request: Request):
 
 
 @router.post("/:lab_id/close")
-async def close_lab(request: Request):
+async def close_lab(request: Request) -> dict | ErrorResponse:
     lab_id = request.path_params.get("lab_id")
     if not await get_lab_by_id(lab_id):
         return err({"success": False, "error": f"Lab {lab_id} not found",
