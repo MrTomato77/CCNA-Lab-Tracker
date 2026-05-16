@@ -1,7 +1,8 @@
-import aiosqlite
+from datetime import datetime
+
 from database.connection import get_db
 
-async def save_timer_session(lab_id: str, started_at: str, duration: int) -> int:
+async def save_timer_session(lab_id: str, started_at: datetime, duration: int) -> int:
     """
     duration == 0  → open new session (INSERT with NULL duration)
     duration  > 0  → close most recent open session (UPDATE + accumulate)
@@ -14,12 +15,13 @@ async def save_timer_session(lab_id: str, started_at: str, duration: int) -> int
     we only credit `progress.time_spent` once per actual close.
     """
     db = await get_db()
+    started_at_value = started_at.isoformat()
 
     if duration == 0:
         # Start: persist open session immediately so timer survives refresh
         await db.execute(
             "INSERT INTO attempts (lab_id, started_at, duration) VALUES (?,?,NULL)",
-            (lab_id, started_at)
+            (lab_id, started_at_value)
         )
         await db.commit()
     else:

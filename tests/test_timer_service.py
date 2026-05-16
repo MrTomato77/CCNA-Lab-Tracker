@@ -7,18 +7,21 @@ This test fires both stops in parallel and asserts time_spent is
 incremented exactly once.
 """
 import asyncio
+from datetime import datetime
 
 from services import timer_service
 
 
 async def test_concurrent_stops_credit_time_only_once(seeded_db):
-    started_at = "2026-05-09T10:00:00"
+    started_at = datetime.fromisoformat("2026-05-09T10:00:00")
     duration   = 120
 
     # Start: persist the open session.
     await timer_service.save_timer_session("LAB-01", started_at, 0)
 
-    # Two stops fire at the same time. Only one should win the UPDATE.
+    # NOTE: aiosqlite serializes operations through a background thread queue,
+    # so this gather() is not a full parallel write test. It still validates
+    # sequential idempotency for duplicate stop events.
     results = await asyncio.gather(
         timer_service.save_timer_session("LAB-01", started_at, duration),
         timer_service.save_timer_session("LAB-01", started_at, duration),
@@ -31,7 +34,7 @@ async def test_concurrent_stops_credit_time_only_once(seeded_db):
     ) as cur:
         row = await cur.fetchone()
     assert row["time_spent"] == duration
-    assert max(results) == duration
+    assert all(r == duration for r in results), f"Expected all == {duration}, got {results}"
 
     # Exactly one closed attempt row.
     async with seeded_db.execute(
@@ -43,8 +46,10 @@ async def test_concurrent_stops_credit_time_only_once(seeded_db):
 
 async def test_open_then_close_accumulates(seeded_db):
     """Sequential open→close→open→close should sum durations."""
-    await timer_service.save_timer_session("LAB-01", "2026-05-09T10:00:00", 0)
-    await timer_service.save_timer_session("LAB-01", "2026-05-09T10:00:00", 60)
-    await timer_service.save_timer_session("LAB-01", "2026-05-09T11:00:00", 0)
-    final = await timer_service.save_timer_session("LAB-01", "2026-05-09T11:00:00", 90)
+    first = datetime.fromisoformat("2026-05-09T10:00:00")
+    second = datetime.fromisoformat("2026-05-09T11:00:00")
+    await timer_service.save_timer_session("LAB-01", first, 0)
+    await timer_service.save_timer_session("LAB-01", first, 60)
+    await timer_service.save_timer_session("LAB-01", second, 0)
+    final = await timer_service.save_timer_session("LAB-01", second, 90)
     assert final == 150
