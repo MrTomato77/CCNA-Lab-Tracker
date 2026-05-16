@@ -1,5 +1,8 @@
 venv
 
+AGENTS.md
+CLAUDE.md
+
 .playwright-mcp/
 __pycache__/
 
