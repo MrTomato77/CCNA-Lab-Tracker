@@ -12,12 +12,14 @@ reliably extractable from the text layer.
 """
 
 import asyncio
+import logging
 import re
 import sys
 from pathlib import Path
 
 import aiosqlite
 from pypdf import PdfReader
+from pypdf.errors import PdfReadError
 
 # Make the project root importable so `core.constants` resolves when the
 # script is invoked as `python scripts/extract_metadata.py` from the repo
@@ -26,9 +28,16 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from core.constants import DIFFICULTY  # noqa: E402
+from database.connection import _add_column_if_missing  # noqa: E402
 
 DOCS_DIR = ROOT / "docs"
 DB_PATH  = ROOT / "database" / "labs.db"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(message)s",
+)
+log = logging.getLogger(__name__)
 
 
 def extract_page1(pdf_path: Path) -> tuple[int | None, int | None]:
@@ -49,8 +58,8 @@ def extract_page1(pdf_path: Path) -> tuple[int | None, int | None]:
             time_m = re.search(r'Time\s*[：:]\s*(\d+)', text, re.IGNORECASE)
             if time_m:
                 minutes = int(time_m.group(1))
-    except Exception as exc:
-        print(f"  [warn] {pdf_path.name}: {exc}")
+    except (PdfReadError, KeyError, ValueError) as exc:
+        log.warning("%s: %s", pdf_path.name, exc)
 
     return difficulty, minutes
 
@@ -58,23 +67,23 @@ def extract_page1(pdf_path: Path) -> tuple[int | None, int | None]:
 async def main() -> int:
     pdfs = sorted(DOCS_DIR.glob("LAB-*.pdf"))
     if not pdfs:
-        print(f"[ERROR] No LAB-XX.pdf files found in {DOCS_DIR}")
-        print("        Run scripts/split_pdf.py first.")
+        log.error("No LAB-XX.pdf files found in %s", DOCS_DIR)
+        log.error("Run scripts/split_pdf.py first.")
         return 1
 
     if not DB_PATH.exists():
-        print(f"[ERROR] Database not found at {DB_PATH}")
-        print("        Start the server once to initialise the DB, then re-run.")
+        log.error("Database not found at %s", DB_PATH)
+        log.error("Start the server once to initialise the DB, then re-run.")
         return 1
 
-    print(f"Scanning {len(pdfs)} PDFs in {DOCS_DIR.name}/")
+    log.info("Scanning %s PDFs in %s/", len(pdfs), DOCS_DIR.name)
 
     async with aiosqlite.connect(DB_PATH) as db:
-        for col in ("difficulty INTEGER", "estimated_minutes INTEGER"):
-            try:
-                await db.execute(f"ALTER TABLE labs ADD COLUMN {col} DEFAULT NULL")
-            except Exception:
-                pass
+        for col_name, col_def in [
+            ("difficulty", "INTEGER DEFAULT NULL"),
+            ("estimated_minutes", "INTEGER DEFAULT NULL"),
+        ]:
+            await _add_column_if_missing(db, "labs", col_name, col_def)
         await db.commit()
 
         updated = skipped = 0
@@ -84,19 +93,19 @@ async def main() -> int:
 
             tag = f"diff={difficulty}  time={minutes}m"
             if difficulty is None and minutes is None:
-                print(f"  {lab_id}: no metadata extracted — skipped  (check PDF text)")
+                log.info("%s: no metadata extracted - skipped (check PDF text)", lab_id)
                 skipped += 1
             else:
                 await db.execute(
                     "UPDATE labs SET difficulty=?, estimated_minutes=? WHERE id=?",
                     (difficulty, minutes, lab_id),
                 )
-                print(f"  {lab_id}: {tag}")
+                log.info("%s: %s", lab_id, tag)
                 updated += 1
 
         await db.commit()
 
-    print(f"\nDone. Updated: {updated}, skipped (no data): {skipped}")
+    log.info("Done. Updated: %s, skipped (no data): %s", updated, skipped)
     return 0
 
 

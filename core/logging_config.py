@@ -17,6 +17,7 @@ hijacking has to happen first.
 import logging
 import os
 import sys
+import warnings
 
 from loguru import logger
 
@@ -82,7 +83,11 @@ def setup_logging() -> None:
     try:
         import robyn.logger  # noqa: F401
     except ImportError:
-        pass
+        warnings.warn(
+            "robyn.logger not found - logging intercept may be incomplete",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     # Hijack stdlib logging.
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
