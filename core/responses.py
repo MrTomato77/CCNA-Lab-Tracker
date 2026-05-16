@@ -19,7 +19,10 @@ status_code)`. Two snags trip up the obvious form:
 """
 
 
-def err(body: dict, status: int) -> tuple:
+ErrorResponse = tuple[dict, dict, int]
+
+
+def err(body: dict, status: int) -> ErrorResponse:
     """Build a Robyn-compatible error response tuple. Headers stay
     empty on purpose — see module docstring for the Robyn quirk."""
     return body, {}, status

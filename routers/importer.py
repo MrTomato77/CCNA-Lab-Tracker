@@ -1,12 +1,14 @@
 from robyn import Request, SubRouter
-from core.responses import err
+from pydantic import ValidationError
+from core.responses import ErrorResponse, err
+from models.schemas import FolderScan
 from services import lab_service
 from services.file_importer import import_from_folder, import_from_bytes
 
 router = SubRouter(__name__, prefix="/api/import")
 
 @router.post("/upload")
-async def upload_files(request: Request):
+async def upload_files(request: Request) -> dict | ErrorResponse:
     files_raw = request.files
     if not files_raw:
         return err({"success": False, "error": "No files received.", "code": "NO_FILES"}, 400)
@@ -27,20 +29,21 @@ async def upload_files(request: Request):
     return {"success": True, "data": {"results": results, "imported_count": len(imported), "total_count": len(results)}}
 
 @router.post("/scan")
-async def scan_folder(request: Request):
-    body = request.json()
-    folder_path = (body.get("folder_path") or "").strip()
-    if not folder_path:
-        return err({"success": False, "error": "folder_path is required.", "code": "VALIDATION_ERROR"}, 422)
+async def scan_folder(request: Request) -> dict | ErrorResponse:
     try:
-        results = await import_from_folder(folder_path)
+        data = FolderScan.model_validate(request.json())
+    except ValidationError as e:
+        return err({"success": False, "error": e.errors()[0]["msg"],
+                    "code": "VALIDATION_ERROR"}, 422)
+    try:
+        results = await import_from_folder(data.folder_path)
     except ValueError as e:
-        return err({"success": False, "error": str(e), "code": "FOLDER_NOT_FOUND"}, 404)
+        return err({"success": False, "error": str(e), "code": "VALIDATION_ERROR"}, 400)
     imported = [r for r in results if r["status"] == "imported"]
     return {"success": True, "data": {"results": results, "imported_count": len(imported), "total_count": len(results)}}
 
 @router.get("/status")
-async def import_status(request: Request):
+async def import_status(request: Request) -> dict:
     rows     = await lab_service.list_with_paths()
     imported = [r for r in rows if r["file_path"] is not None]
     missing  = [r for r in rows if r["file_path"] is None]

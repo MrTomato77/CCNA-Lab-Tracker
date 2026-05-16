@@ -3,6 +3,7 @@ import json
 import aiosqlite
 from core.constants import STATUS_NOT_STARTED
 from database.connection import get_db
+from loguru import logger
 
 async def get_all_labs() -> list[dict]:
     db = await get_db()
@@ -57,12 +58,13 @@ async def update_status(lab_id: str, status: str) -> bool:
     await db.commit()
     return changed
 
-async def update_last_opened(lab_id: str, timestamp: str):
+async def update_last_opened(lab_id: str, timestamp: str) -> None:
     db = await get_db()
-    await db.execute(
+    async with db.execute(
         "UPDATE progress SET last_opened=? WHERE lab_id=?",
         (timestamp, lab_id)
-    )
+    ):
+        pass
     await db.commit()
 
 async def get_file_path(lab_id: str) -> str | None:
@@ -71,7 +73,7 @@ async def get_file_path(lab_id: str) -> str | None:
         row = await cur.fetchone()
     return row["file_path"] if row else None
 
-async def reset_all_labs():
+async def reset_all_labs() -> None:
     """Reset all labs to Not Started status and clear all timer data."""
     db = await get_db()
     await db.execute(
@@ -81,7 +83,7 @@ async def reset_all_labs():
     await db.execute("DELETE FROM attempts")
     await db.commit()
 
-async def reset_lab(lab_id: str):
+async def reset_lab(lab_id: str) -> None:
     """Reset a specific lab to Not Started and clear its attempts."""
     db = await get_db()
     await db.execute(
@@ -100,6 +102,16 @@ async def list_with_paths() -> list[dict]:
         return [dict(r) for r in await cur.fetchall()]
 
 
+def _safe_json(raw: str | None, lab_id: str, field: str) -> list | None:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        logger.bind(name="db").error(f"Corrupt JSON in labs.{field} for {lab_id}: {raw!r}")
+        return None
+
+
 async def read_summary(lab_id: str) -> dict | None:
     """Return cheat-sheet dict for the lab. Returns None when the lab
     has no summary content at all (all 4 columns NULL); otherwise omits
@@ -116,10 +128,13 @@ async def read_summary(lab_id: str) -> dict | None:
     out: dict = {}
     if row["summary"]:
         out["summary"] = row["summary"]
-    if row["core_commands"]:
-        out["core_commands"] = json.loads(row["core_commands"])
-    if row["verify_commands"]:
-        out["verify_commands"] = json.loads(row["verify_commands"])
-    if row["gotchas"]:
-        out["gotchas"] = json.loads(row["gotchas"])
+    core_commands = _safe_json(row["core_commands"], lab_id, "core_commands")
+    if core_commands is not None:
+        out["core_commands"] = core_commands
+    verify_commands = _safe_json(row["verify_commands"], lab_id, "verify_commands")
+    if verify_commands is not None:
+        out["verify_commands"] = verify_commands
+    gotchas = _safe_json(row["gotchas"], lab_id, "gotchas")
+    if gotchas is not None:
+        out["gotchas"] = gotchas
     return out or None

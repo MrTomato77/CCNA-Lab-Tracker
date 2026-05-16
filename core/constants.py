@@ -9,6 +9,7 @@ from typing import Literal
 STATUS_NOT_STARTED = "not_started"
 STATUS_IN_PROGRESS = "in_progress"
 STATUS_DONE        = "done"
+MAX_LAB_NUMBER     = 51
 
 Status = Literal["not_started", "in_progress", "done"]
 

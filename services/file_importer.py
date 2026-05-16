@@ -1,13 +1,14 @@
+import os
 import re
 import shutil
 import aiofiles
 from pathlib import Path
 from loguru import logger
+from core.constants import MAX_LAB_NUMBER
 from database.connection import get_db
 
 LABS_FILES_DIR = Path(__file__).parent.parent / "labs"
-
-_MAX_LAB_NUMBER = 51   # bump if LAB_DEFINITIONS in database/seed.py grows
+ALLOWED_IMPORT_ROOT = Path(os.getenv("CCNA_IMPORT_ROOT", str(Path.home()))).resolve()
 
 # Real .pka files are ~1–5 MB. A 100 MB ceiling rejects ZIP-bomb-style
 # uploads and accidental drops of large unrelated files (videos, ISOs)
@@ -30,14 +31,15 @@ def extract_lab_id(filename: str) -> str | None:
     if not match:
         return None
     n = int(match.group(1))
-    if not (1 <= n <= _MAX_LAB_NUMBER):
+    if not (1 <= n <= MAX_LAB_NUMBER):
         return None
     return f"LAB-{n:02d}"
 
 def dest_path(lab_id: str) -> Path:
+    """Return the canonical destination path for an imported .pka lab file."""
     return LABS_FILES_DIR / f"{lab_id}.pka"
 
-async def _update_db(lab_id: str, path: Path):
+async def _update_db(lab_id: str, path: Path) -> None:
     db = await get_db()
     await db.execute("UPDATE labs SET file_path=? WHERE id=?", (str(path), lab_id))
     await db.commit()
@@ -47,6 +49,9 @@ async def import_from_bytes(filename: str, content: bytes) -> dict:
     lab_id = extract_lab_id(filename)
     if not lab_id:
         return {"file": filename, "status": "skipped", "reason": "Cannot extract LAB-XX from filename"}
+    if not content:
+        return {"file": filename, "lab_id": lab_id, "status": "skipped",
+                "reason": "Empty file payload"}
     if len(content) > _MAX_FILE_BYTES:
         return {"file": filename, "lab_id": lab_id, "status": "skipped",
                 "reason": f"File exceeds {_MAX_FILE_BYTES // (1024*1024)} MB limit"}
@@ -71,6 +76,9 @@ async def import_single_file(src: Path) -> dict:
         size = src.stat().st_size
     except OSError as e:
         return {"file": src.name, "lab_id": lab_id, "status": "error", "reason": str(e)}
+    if size == 0:
+        return {"file": src.name, "lab_id": lab_id, "status": "skipped",
+                "reason": "Empty file payload"}
     if size > _MAX_FILE_BYTES:
         return {"file": src.name, "lab_id": lab_id, "status": "skipped",
                 "reason": f"File exceeds {_MAX_FILE_BYTES // (1024*1024)} MB limit"}
@@ -85,7 +93,11 @@ async def import_single_file(src: Path) -> dict:
         return {"file": src.name, "lab_id": lab_id, "status": "error", "reason": str(e)}
 
 async def import_from_folder(folder_path: str) -> list[dict]:
-    folder = Path(folder_path)
+    folder = Path(folder_path).resolve()
+    try:
+        folder.relative_to(ALLOWED_IMPORT_ROOT)
+    except ValueError as exc:
+        raise ValueError(f"folder_path must be inside {ALLOWED_IMPORT_ROOT}") from exc
     if not folder.exists() or not folder.is_dir():
         raise ValueError(f"Folder not found: {folder_path}")
     # Drop symlinks before iterating — rglob() follows them silently and

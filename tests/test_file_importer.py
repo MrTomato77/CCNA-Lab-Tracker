@@ -7,7 +7,8 @@ edit to the regex can't quietly regress it.
 """
 import pytest
 
-from services.file_importer import extract_lab_id, _MAX_LAB_NUMBER
+from core.constants import MAX_LAB_NUMBER
+from services.file_importer import extract_lab_id
 
 
 @pytest.mark.parametrize("filename", [
@@ -35,12 +36,12 @@ def test_accepts_in_range_with_padding(filename, expected):
 
 
 def test_max_lab_number_constant_matches_seed():
-    """If LAB_DEFINITIONS in database/seed.py grows past _MAX_LAB_NUMBER,
+    """If LAB_DEFINITIONS in database/seed.py grows past MAX_LAB_NUMBER,
     the bounds check would silently reject valid imports. Catch the drift
     here so the constant gets bumped intentionally."""
     from database import seed
     seeded_max = max(int(lab[0].split("-")[1]) for lab in seed.LAB_DEFINITIONS)
-    assert seeded_max <= _MAX_LAB_NUMBER, (
+    assert seeded_max <= MAX_LAB_NUMBER, (
         f"seed.LAB_DEFINITIONS goes up to LAB-{seeded_max}, but "
-        f"file_importer._MAX_LAB_NUMBER is {_MAX_LAB_NUMBER}. Bump it."
+        f"core.constants.MAX_LAB_NUMBER is {MAX_LAB_NUMBER}. Bump it."
     )
