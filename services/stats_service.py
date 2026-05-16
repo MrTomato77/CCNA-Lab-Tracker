@@ -18,7 +18,7 @@ async def summary() -> dict:
     """, (STATUS_DONE, STATUS_IN_PROGRESS, STATUS_NOT_STARTED)) as cur:
         row = dict(await cur.fetchone())
     total = row["total"] or 1
-    row["completion_percent"] = round((row["done"] / total) * 100, 1)
+    row["completion_percent"] = round(((row["done"] or 0) / total) * 100, 1)
     return row
 
 

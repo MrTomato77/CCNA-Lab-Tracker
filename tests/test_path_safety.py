@@ -10,14 +10,7 @@ import app as app_mod
 
 
 def _is_safe(filename: str) -> bool:
-    """Mirror of the in-route check, kept in sync with app.lab_docs."""
-    if not filename.endswith(".pdf"):
-        return False
-    try:
-        target = (app_mod.DOCS_DIR / filename).resolve()
-    except (OSError, ValueError):
-        return False
-    return target.is_relative_to(app_mod.DOCS_DIR)
+    return app_mod.is_safe_doc_path(filename)
 
 
 def test_docs_dir_is_resolved():
@@ -47,4 +40,3 @@ def test_accepts_simple_pdf_name():
     # Doesn't have to exist on disk; the existence check happens after
     # the safety check in the real route.
     assert _is_safe("LAB-01.pdf")
-    assert _is_safe("anything.pdf")

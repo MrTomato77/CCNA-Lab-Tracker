@@ -47,4 +47,4 @@ async def seeded_db(tmp_db):
         ("LAB-01", "not_started", 0),
     )
     await tmp_db.commit()
-    return tmp_db
+    yield tmp_db

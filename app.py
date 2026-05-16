@@ -37,7 +37,7 @@ _STATIC_BIN: dict[str, bytes] = {}   # binary assets (favicon)
 # Allowed before any registered POST route can match. Three explicit GET
 # routes for the SPA shell + two static assets sidesteps that entirely.
 @app.get("/")
-async def index(request: Request):
+async def index(request: Request) -> Response:
     return Response(
         status_code=200,
         headers={"Content-Type": "text/html; charset=utf-8"},
@@ -45,7 +45,7 @@ async def index(request: Request):
     )
 
 @app.get("/style.css")
-async def style_css(request: Request):
+async def style_css(request: Request) -> Response:
     return Response(
         status_code=200,
         headers={"Content-Type": "text/css; charset=utf-8"},
@@ -53,7 +53,7 @@ async def style_css(request: Request):
     )
 
 @app.get("/app.js")
-async def app_js(request: Request):
+async def app_js(request: Request) -> Response:
     return Response(
         status_code=200,
         headers={"Content-Type": "application/javascript; charset=utf-8"},
@@ -61,7 +61,7 @@ async def app_js(request: Request):
     )
 
 @app.get("/logo.ico")
-async def logo_ico(request: Request):
+async def logo_ico(request: Request) -> Response:
     return Response(
         status_code=200,
         headers={"Content-Type": "image/x-icon",
@@ -70,24 +70,31 @@ async def logo_ico(request: Request):
     )
 
 @app.get("/favicon.ico")
-async def favicon_ico(request: Request):
+async def favicon_ico(request: Request) -> Response:
     # Browsers request /favicon.ico unconditionally even when the HTML
     # specifies a different icon path. Alias to keep the access log clean.
     return await logo_ico(request)
 
+def is_safe_doc_path(filename: str) -> bool:
+    """Return True when filename resolves to a PDF inside DOCS_DIR."""
+    if not filename.endswith(".pdf"):
+        return False
+    try:
+        pdf = (DOCS_DIR / filename).resolve()
+    except (OSError, ValueError):
+        return False
+    return pdf.is_relative_to(DOCS_DIR)
+
 @app.get("/docs/:filename")
-async def lab_docs(request: Request):
+async def lab_docs(request: Request) -> Response:
     # filename arrives as e.g. "LAB-07.pdf". Resolve the candidate path and
     # confirm it stays inside DOCS_DIR — defeats `..`, encoded variants, and
     # symlink farms that the old slash-reject couldn't catch.
     filename = request.path_params.get("filename", "")
-    if not filename.endswith(".pdf"):
+    if not is_safe_doc_path(filename):
         return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
-    try:
-        pdf = (DOCS_DIR / filename).resolve()
-    except (OSError, ValueError):
-        return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
-    if not pdf.is_relative_to(DOCS_DIR) or not pdf.is_file():
+    pdf = (DOCS_DIR / filename).resolve()
+    if not pdf.is_file():
         return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
     async with aiofiles.open(pdf, "rb") as f:
         data = await f.read()
@@ -114,22 +121,23 @@ app.include_router(importer.router)
 # attach the response status to the request line. So: log only on
 # before_request — method + path is the high-value 80% of an access log.
 @app.before_request()
-async def _log_request(request: Request):
-    method = getattr(request, "method", "?")
-    path   = getattr(request, "url", None) or getattr(request, "path", "?")
+async def _log_request(request: Request) -> Request:
+    method = request.method
+    path   = request.url
     if hasattr(path, "path"):  # Robyn URL object → string
         path = path.path
     logger.bind(name="http").info(f"{method} {path}")
     return request
 
 @app.startup_handler
-async def startup():
+async def startup() -> None:
     from services.pt_launcher import PT_EXE
     labs_dir = Path(__file__).parent / "labs"
     labs_dir.mkdir(exist_ok=True)
     # Cache the SPA shell + static assets once. They're served on every
     # page load and don't change at runtime, so reading them in async
-    # handlers would block the event loop for no benefit.
+    # handlers would block the event loop for no benefit. These synchronous
+    # reads happen during startup only, before the server accepts requests.
     for name in ("index.html", "style.css", "app.js"):
         _STATIC[name] = (PUBLIC / name).read_text(encoding="utf-8")
     _STATIC_BIN["logo.ico"] = (PUBLIC / "logo.ico").read_bytes()
@@ -143,7 +151,7 @@ async def startup():
     logger.bind(name="app").info("listening on http://localhost:8080")
 
 @app.shutdown_handler
-async def shutdown():
+async def shutdown() -> None:
     await close_db()
     logger.bind(name="app").info("server stopped")
 
