@@ -19,6 +19,72 @@ const CATEGORIES = Object.freeze([
 // 8h cap on resumed timers — see labCard.init() for rationale.
 const TIMER_RESUME_CAP_SEC = 8 * 3600;
 
+// ── Transitions service ───────────────────────────────────────────────────
+// Single source of truth for animation timing and easings, mirrored in
+// CSS custom properties (:root in style.css). JS-driven follow-ups
+// (toasts, chart rerenders) should read from here so they can't drift
+// from the stylesheet.
+//
+// setupLeaveAnchor() fixes the "spawn then snap" jank when Alpine x-show
+// fades a list item out: by default the leaving element keeps its slot in
+// flow until display:none lands, so siblings reflow only at the END of
+// the fade. We watch for the leave class landing on a tracked
+// container's descendants, snapshot the element's rect, and switch it to
+// position:absolute — taking it out of flow immediately so the layout
+// settles in frame 1. Inline styles are restored when the leave class is
+// removed, leaving the element ready for a fresh enter cycle next time.
+//
+// Reusable for any container/leave-class pair (lists, modals, drawers).
+const Transitions = Object.freeze({
+  DURATION: Object.freeze({ fast: 120, normal: 200, slow: 320 }),  // ms
+  EASING: Object.freeze({
+    default: 'cubic-bezier(.2, .8, .2, 1)',
+    sharp:   'cubic-bezier(.4, 0, .6, 1)',
+  }),
+
+  setupLeaveAnchor(containerSelector, leaveClass = 'card-fade-leave') {
+    document.querySelectorAll(containerSelector).forEach((container) => {
+      if (getComputedStyle(container).position === 'static') {
+        container.style.position = 'relative';
+      }
+      new MutationObserver((records) => {
+        for (const r of records) {
+          const el = r.target;
+          if (el === container || !el.classList) continue;
+          const isLeaving  = el.classList.contains(leaveClass);
+          const isAnchored = el.dataset.txAnchored === '1';
+
+          if (isLeaving && !isAnchored) {
+            const cRect = container.getBoundingClientRect();
+            const eRect = el.getBoundingClientRect();
+            el.dataset.txAnchored = '1';
+            el.style.position = 'absolute';
+            el.style.top    = `${eRect.top  - cRect.top }px`;
+            el.style.left   = `${eRect.left - cRect.left}px`;
+            el.style.width  = `${eRect.width}px`;
+          } else if (!isLeaving && isAnchored) {
+            // Alpine removed the leave class → fade done, restore flow.
+            el.style.position = '';
+            el.style.top      = '';
+            el.style.left     = '';
+            el.style.width    = '';
+            delete el.dataset.txAnchored;
+          }
+        }
+      }).observe(container, {
+        attributes: true,
+        attributeFilter: ['class'],
+        subtree: true,
+      });
+    });
+  },
+});
+window.Transitions = Transitions;
+
+document.addEventListener('DOMContentLoaded', () => {
+  Transitions.setupLeaveAnchor('.cards-grid', 'card-fade-leave');
+});
+
 // ── Fetch wrapper ─────────────────────────────────────────────────────────
 // All POST sites used to repeat the same `headers` + `JSON.stringify` body
 // shape. Wrap once. GET keeps working — pass no body, returns parsed JSON.

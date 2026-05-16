@@ -89,6 +89,16 @@
   --radius-pill: 999px;
   --font-sans:    "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono:    "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+
+  /* Transition system — single source of truth, mirrored in window.Transitions
+     (see app.js top). Components that schedule follow-up work in JS (toasts,
+     chart rerenders) should read from window.Transitions so the values can't
+     drift away from these CSS variables. */
+  --tx-duration-fast:    120ms;
+  --tx-duration-normal:  200ms;
+  --tx-duration-slow:    320ms;
+  --tx-easing-default:   cubic-bezier(.2, .8, .2, 1);
+  --tx-easing-sharp:     cubic-bezier(.4, 0,  .6, 1);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -410,6 +420,9 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* Anchor for absolute-positioned leaving cards — see
+     window.Transitions.setupLeaveAnchor() in app.js. */
+  position: relative;
 }
 
 /* ── Lab card ─────────────────────────────────────────────────────────── */
@@ -425,25 +438,21 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--radius-card);
 }
 
-/* Filter chip / dropdown click → cards fade out, the grid collapses, then
-   matching cards fade in. Enter is delayed by the leave duration so the
-   two phases are sequenced — without the delay both run concurrently and
-   incoming cards spawn at their old DOM position before jumping up as
-   leaving cards collapse from layout, which reads as a stutter. */
-.card-fade-leave {
-  transition: opacity 130ms ease-out;
-}
+/* Filter chip / dropdown click → cards crossfade. The staggered-delay
+   workaround that used to live here just hid the symptom; the real fix
+   is layout-level: leaving cards are pinned to position:absolute by the
+   Transitions service so they drop out of flow immediately. Incoming
+   cards land in their final slots from frame 1 — no spawn-then-snap. */
 .card-fade-enter {
-  transition: opacity 180ms ease-out 130ms;
+  transition: opacity var(--tx-duration-normal) var(--tx-easing-default);
+}
+.card-fade-leave {
+  transition: opacity var(--tx-duration-fast)   var(--tx-easing-default);
 }
 .card-fade-enter-from,
-.card-fade-leave-to {
-  opacity: 0;
-}
+.card-fade-leave-to   { opacity: 0; }
 .card-fade-enter-to,
-.card-fade-leave-from {
-  opacity: 1;
-}
+.card-fade-leave-from { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
   .card-fade-enter,
   .card-fade-leave { transition: none; }
