@@ -19,6 +19,11 @@ status_code)`. Two snags trip up the obvious form:
 """
 
 
+from typing import Any
+
+from pydantic import ValidationError
+
+
 ErrorResponse = tuple[dict, dict, int]
 
 
@@ -26,3 +31,31 @@ def err(body: dict, status: int) -> ErrorResponse:
     """Build a Robyn-compatible error response tuple. Headers stay
     empty on purpose — see module docstring for the Robyn quirk."""
     return body, {}, status
+
+
+def ok(data: Any | None = None, message: str | None = None) -> dict:
+    """Build the common successful API response body."""
+    body: dict[str, Any] = {"success": True}
+    if data is not None:
+        body["data"] = data
+    if message is not None:
+        body["message"] = message
+    return body
+
+
+def api_error(error: str, code: str, status: int) -> ErrorResponse:
+    """Build the common failed API response body."""
+    return err({"success": False, "error": error, "code": code}, status)
+
+
+def validation_error(exc: ValidationError) -> ErrorResponse:
+    """Return the first Pydantic validation message as a 422 response."""
+    return api_error(exc.errors()[0]["msg"], "VALIDATION_ERROR", 422)
+
+
+def lab_not_found(lab_id: str | None) -> ErrorResponse:
+    return api_error(f"Lab {lab_id} not found.", "LAB_NOT_FOUND", 404)
+
+
+def internal_error(code: str) -> ErrorResponse:
+    return api_error("An internal error occurred.", code, 500)

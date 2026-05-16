@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from robyn import Request, SubRouter
-from core.responses import ErrorResponse, err
+from core.responses import ErrorResponse, err, lab_not_found, ok
 from services.lab_service import get_file_path, get_lab_by_id, update_last_opened
 from services.pt_launcher import launch_pka, terminate_pt
 
@@ -13,14 +13,13 @@ async def open_lab(request: Request) -> dict | ErrorResponse:
     # bogus id like "LAB-99" used to surface as `NO_FILE_IMPORTED` (400),
     # which reads as "you forgot to import" instead of "no such lab".
     if not await get_lab_by_id(lab_id):
-        return err({"success": False, "error": f"Lab {lab_id} not found",
-                    "code": "LAB_NOT_FOUND"}, 404)
+        return lab_not_found(lab_id)
     file_path = await get_file_path(lab_id)
     result    = await launch_pka(lab_id, file_path)
     if result["success"]:
         now = datetime.now(timezone.utc).isoformat()
         await update_last_opened(lab_id, now)
-        return {"success": True}
+        return ok()
     code   = result.get("code", "PT_UNKNOWN_ERROR")
     status = 400 if code == "NO_FILE_IMPORTED" else 500
     return err({"success": False, "error": result["error"], "code": code}, status)
@@ -30,8 +29,7 @@ async def open_lab(request: Request) -> dict | ErrorResponse:
 async def close_lab(request: Request) -> dict | ErrorResponse:
     lab_id = request.path_params.get("lab_id")
     if not await get_lab_by_id(lab_id):
-        return err({"success": False, "error": f"Lab {lab_id} not found",
-                    "code": "LAB_NOT_FOUND"}, 404)
+        return lab_not_found(lab_id)
     result = terminate_pt(lab_id)
     if not result["success"]:
         return err(result, 500)
