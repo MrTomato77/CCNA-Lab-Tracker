@@ -84,20 +84,20 @@
               @keydown.arrow-down.prevent="$event.target.nextElementSibling?.focus()"
               @keydown.arrow-up.prevent="$event.target.previousElementSibling?.focus()">
               <button class="status-option" role="menuitem" :class="{ active: hideStatus === '' }"
-                @click="hideStatus = ''; statusOpen = false; $refs.statusTrigger.focus()">All status</button>
+                @click="setFilter(() => hideStatus = ''); statusOpen = false; $refs.statusTrigger.focus()">All status</button>
               <button class="status-option" role="menuitem" :class="{ active: hideStatus === 'done' }"
-                @click="hideStatus = 'done'; statusOpen = false; $refs.statusTrigger.focus()">Hide done</button>
+                @click="setFilter(() => hideStatus = 'done'); statusOpen = false; $refs.statusTrigger.focus()">Hide done</button>
               <button class="status-option" role="menuitem" :class="{ active: hideStatus === 'undone' }"
-                @click="hideStatus = 'undone'; statusOpen = false; $refs.statusTrigger.focus()">Hide not done</button>
+                @click="setFilter(() => hideStatus = 'undone'); statusOpen = false; $refs.statusTrigger.focus()">Hide not done</button>
             </div>
           </div>
           <button class="filter-chip"
             :class="{ active: filterCat==='', 'filter-chip--done': labs.length > 0 && labs.every(l => l.status === 'done') }"
-            @click="filterCat=''">All</button>
+            @click="setFilter(() => filterCat='')">All</button>
           <template x-for="cat in categories" :key="cat">
             <button class="filter-chip"
               :class="{ active: filterCat===cat, 'filter-chip--done': categoryDone(cat) }"
-              @click="filterCat=cat"
+              @click="setFilter(() => filterCat=cat)"
               x-text="cat"></button>
           </template>
         </div>

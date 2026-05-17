@@ -22,19 +22,33 @@ const TIMER_RESUME_CAP_SEC = 8 * 3600;
 // ── Transitions service ───────────────────────────────────────────────────
 // Single source of truth for animation timing and easings, mirrored in
 // CSS custom properties (:root in style.css). JS-driven follow-ups
-// (toasts, chart rerenders) should read from here so they can't drift
+// (toasts, chart re-renders) should read from here so they can't drift
 // from the stylesheet.
 //
-// setupLeaveAnchor() fixes the "spawn then snap" jank when Alpine x-show
-// fades a list item out: by default the leaving element keeps its slot in
-// flow until display:none lands, so siblings reflow only at the END of
-// the fade. We watch for the leave class landing on a tracked
-// container's descendants, snapshot the element's rect, and switch it to
-// position:absolute — taking it out of flow immediately so the layout
-// settles in frame 1. Inline styles are restored when the leave class is
-// removed, leaving the element ready for a fresh enter cycle next time.
+// filterList() smooths list-filter transitions by combining two
+// techniques into one orchestrator:
 //
-// Reusable for any container/leave-class pair (lists, modals, drawers).
+//   • LEAVING cards (visible → hidden) are pinned to position:absolute
+//     at their old rect, dropping out of flow immediately so siblings
+//     don't reserve their slots during the fade-out.
+//   • REMAINING cards (visible → visible) get a FLIP animation: snapshot
+//     before, measure after, jump back to the old position via
+//     transform, then animate the transform to zero. The user sees a
+//     smooth slide from old slot to new slot rather than an instant
+//     "snap up" when the layout collapses.
+//   • ENTERING cards (hidden → visible) are left alone — Alpine's enter
+//     transition fades them in at their final slot, which is correct
+//     because leaving cards are already out of flow by then.
+//
+// Usage:
+//   const flip = Transitions.filterList('.cards-grid');
+//   // Inside a filter handler:
+//   flip.snapshot();         // capture positions before mutation
+//   this.filterCat = cat;    // trigger Alpine reactivity
+//   this.$nextTick(() => flip.play());
+//
+// Reusable for any flex/grid list with x-show + fade transitions — pass
+// the container selector, optionally override duration/easing/leaveClass.
 const Transitions = Object.freeze({
   DURATION: Object.freeze({ fast: 120, normal: 200, slow: 320 }),  // ms
   EASING: Object.freeze({
@@ -42,48 +56,88 @@ const Transitions = Object.freeze({
     sharp:   'cubic-bezier(.4, 0, .6, 1)',
   }),
 
-  setupLeaveAnchor(containerSelector, leaveClass = 'card-fade-leave') {
-    document.querySelectorAll(containerSelector).forEach((container) => {
-      if (getComputedStyle(container).position === 'static') {
-        container.style.position = 'relative';
-      }
-      new MutationObserver((records) => {
-        for (const r of records) {
-          const el = r.target;
-          if (el === container || !el.classList) continue;
-          const isLeaving  = el.classList.contains(leaveClass);
-          const isAnchored = el.dataset.txAnchored === '1';
+  filterList(containerSelector, opts = {}) {
+    const duration   = opts.duration   ?? this.DURATION.normal;
+    const easing     = opts.easing     ?? this.EASING.default;
+    const leaveClass = opts.leaveClass ?? 'card-fade-leave';
 
-          if (isLeaving && !isAnchored) {
-            const cRect = container.getBoundingClientRect();
-            const eRect = el.getBoundingClientRect();
-            el.dataset.txAnchored = '1';
-            el.style.position = 'absolute';
-            el.style.top    = `${eRect.top  - cRect.top }px`;
-            el.style.left   = `${eRect.left - cRect.left}px`;
-            el.style.width  = `${eRect.width}px`;
-          } else if (!isLeaving && isAnchored) {
-            // Alpine removed the leave class → fade done, restore flow.
+    let oldPositions = new Map();
+
+    const realChildren = (container) =>
+      [...container.children].filter((el) => el.tagName !== 'TEMPLATE');
+
+    return {
+      snapshot() {
+        oldPositions = new Map();
+        for (const container of document.querySelectorAll(containerSelector)) {
+          if (getComputedStyle(container).position === 'static') {
+            container.style.position = 'relative';
+          }
+          for (const el of realChildren(container)) {
+            if (getComputedStyle(el).display === 'none') continue;
+            oldPositions.set(el, {
+              rect: el.getBoundingClientRect(),
+              container,
+            });
+          }
+        }
+      },
+
+      play() {
+        // Pass 1 — pin leaving cards to absolute at their snapshotted
+        // position, taking them out of flow so layout settles to its
+        // final form before we measure remaining cards.
+        for (const [el, { rect: oldRect, container }] of oldPositions) {
+          if (!el.classList.contains(leaveClass)) continue;
+          const cRect = container.getBoundingClientRect();
+          el.style.position = 'absolute';
+          el.style.top    = `${oldRect.top  - cRect.top }px`;
+          el.style.left   = `${oldRect.left - cRect.left}px`;
+          el.style.width  = `${oldRect.width}px`;
+          const onLeaveEnd = (e) => {
+            if (e.propertyName !== 'opacity') return;
             el.style.position = '';
             el.style.top      = '';
             el.style.left     = '';
             el.style.width    = '';
-            delete el.dataset.txAnchored;
-          }
+            el.removeEventListener('transitionend', onLeaveEnd);
+          };
+          el.addEventListener('transitionend', onLeaveEnd);
         }
-      }).observe(container, {
-        attributes: true,
-        attributeFilter: ['class'],
-        subtree: true,
-      });
-    });
+
+        // Pass 2 — FLIP remaining cards. Layout is now collapsed (leaving
+        // cards are absolute), so getBoundingClientRect returns the FINAL
+        // positions. We jump back to old positions via transform, then
+        // animate the transform to zero on the next frame.
+        for (const [el, { rect: oldRect }] of oldPositions) {
+          if (el.classList.contains(leaveClass)) continue;
+          if (getComputedStyle(el).display === 'none') continue;
+          const newRect = el.getBoundingClientRect();
+          const dx = oldRect.left - newRect.left;
+          const dy = oldRect.top  - newRect.top;
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) continue;
+
+          el.style.transition = 'none';
+          el.style.transform  = `translate(${dx}px, ${dy}px)`;
+          // Force the inverted state to apply before unwinding it.
+          void el.offsetWidth;
+          requestAnimationFrame(() => {
+            el.style.transition = `transform ${duration}ms ${easing}`;
+            el.style.transform  = '';
+            const onFlipEnd = (e) => {
+              if (e.propertyName !== 'transform') return;
+              el.style.transition = '';
+              el.style.transform  = '';
+              el.removeEventListener('transitionend', onFlipEnd);
+            };
+            el.addEventListener('transitionend', onFlipEnd);
+          });
+        }
+      },
+    };
   },
 });
 window.Transitions = Transitions;
-
-document.addEventListener('DOMContentLoaded', () => {
-  Transitions.setupLeaveAnchor('.cards-grid', 'card-fade-leave');
-});
 
 // ── Fetch wrapper ─────────────────────────────────────────────────────────
 // All POST sites used to repeat the same `headers` + `JSON.stringify` body
@@ -184,8 +238,22 @@ window.appShell = function() {
     statusOpen: false,
     theme: document.documentElement.getAttribute("data-theme") || "light",
     categories: CATEGORIES,
+    // FLIP orchestrator for filter-list transitions. Created lazily in
+    // init() because Transitions.filterList queries the DOM and the
+    // .cards-grid container has to exist first.
+    _flip: null,
 
     get summary() { return this.$store.app.summary; },
+
+    // Route filter mutations through one method so we get a consistent
+    // snapshot → mutate → play cycle. Each call site only needs to pass
+    // the updater; the orchestrator handles everything else.
+    setFilter(updater) {
+      if (!this._flip) this._flip = Transitions.filterList('.cards-grid');
+      this._flip.snapshot();
+      updater();
+      this.$nextTick(() => this._flip.play());
+    },
 
     async init() {
       await this.fetchLabs();
