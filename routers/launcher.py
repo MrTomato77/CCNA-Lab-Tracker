@@ -9,9 +9,7 @@ router = SubRouter(__name__, prefix="/api/labs")
 @router.post("/:lab_id/open")
 async def open_lab(request: Request) -> dict | ErrorResponse:
     lab_id = request.path_params.get("lab_id")
-    # Verify the lab id exists before falling through to launch_pka — a
-    # bogus id like "LAB-99" used to surface as `NO_FILE_IMPORTED` (400),
-    # which reads as "you forgot to import" instead of "no such lab".
+    # Verify id first — bogus ids would surface as NO_FILE_IMPORTED instead of 404.
     _, err_resp = await require_lab(lab_id)
     if err_resp:
         return err_resp

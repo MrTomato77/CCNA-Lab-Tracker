@@ -37,12 +37,10 @@ def labs_on_page(text: str) -> list[int]:
 
 
 def find_section_starts(reader: PdfReader) -> dict[int, int]:
-    """Map lab number -> 0-indexed page where its section starts.
+    """Map lab number → 0-indexed start page.
 
-    Heuristic: a lab section starts on the first page that mentions exactly
-    one lab id (TOC pages mention many at once and are skipped). Once a lab
-    has been claimed, later pages mentioning it are treated as body pages
-    (they belong to that lab's section, not a new section).
+    Heuristic: a section starts on the first page mentioning exactly one lab id
+    (TOC pages mention many and are skipped). Later pages for the same lab are body pages.
     """
     starts: dict[int, int] = {}
     for i, page in enumerate(reader.pages):
@@ -100,8 +98,7 @@ def main() -> int:
     written = skipped = 0
     for lab_num in found_labs:
         start = starts[lab_num]
-        # End = start of next detected lab, or end of PDF for the last one
-        next_labs = [s for n, s in starts.items() if s > start]
+        next_labs = [s for n, s in starts.items() if s > start]  # end at next section
         end = min(next_labs) if next_labs else total_pages
         dest = OUT_DIR / f"LAB-{lab_num:02d}.pdf"
         if dest.exists() and not args.force:

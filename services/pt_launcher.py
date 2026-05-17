@@ -1,7 +1,6 @@
 import ctypes
 import os
-# Packet Tracer launch is this module's core job; calls below use shell=False.
-import subprocess  # nosec B404
+import subprocess  # nosec B404  — shell=False throughout
 import sys
 import threading
 import time
@@ -9,20 +8,14 @@ from ctypes import wintypes
 from pathlib import Path
 from loguru import logger
 
-# `load_dotenv()` is called once in app.py before this module is imported.
 PT_EXE = os.getenv("PACKET_TRACER_EXE", r"C:\Program Files\Cisco Packet Tracer\PacketTracer.exe")
 
-# lab_id -> Popen handle. Kept in-memory only; on server restart the PT
-# instances become orphaned and the user closes them manually. The dict
-# is a convenience for the /close route, not a source of truth.
+# lab_id → Popen handle. In-memory only; orphaned on restart — a convenience
+# for the /close route, not a source of truth.
 _pt_processes: dict[str, subprocess.Popen] = {}
 _pt_lock = threading.Lock()
 
-
-# Win32 constants for the post-launch maximize. PT is a Qt app and Qt
-# ignores STARTUPINFO.wShowWindow / nCmdShow — the only mechanism that
-# actually takes effect is calling ShowWindow on the live HWND once the
-# main window is visible.
+# Win32 constants for post-launch maximize.
 _SW_MAXIMIZE   = 3
 _GW_OWNER      = 4
 _MAX_WAIT_SEC  = 60.0
@@ -36,12 +29,10 @@ def _drop_exited_locked() -> None:
 
 
 def _maximize_after_launch(pid: int) -> None:
-    """Poll top-level windows for one owned by `pid`, then ShowWindow it
-    maximized. Runs on a daemon thread so launch_pka can return.
+    """Poll for the PT main window then ShowWindow(maximize) on a daemon thread.
 
-    Why this and not STARTUPINFO: PT is a Qt app and Qt ignores the
-    nCmdShow hint passed via STARTUPINFO. Setting the window state
-    after the window exists is the only mechanism that takes effect.
+    PT is a Qt app and ignores STARTUPINFO.nCmdShow — ShowWindow on the live
+    HWND is the only mechanism that takes effect.
     """
     if sys.platform != "win32":
         return
@@ -66,7 +57,7 @@ def _maximize_after_launch(pid: int) -> None:
             if user32.GetWindow(hwnd, _GW_OWNER) != 0:
                 return True
             hits.append(hwnd)
-            return False  # stop enumerating
+            return False
 
         user32.EnumWindows(EnumWindowsProc(cb), 0)
         return hits[0] if hits else 0
@@ -118,8 +109,6 @@ async def launch_pka(lab_id: str, file_path: str | None) -> dict:
                 "code": "PT_NOT_FOUND"}
 
     try:
-        # Replace any prior tracked instance for this lab — relaunching
-        # without stopping should not leak the old handle.
         with _pt_lock:
             _drop_exited_locked()
             prior = _pt_processes.pop(lab_id, None)
@@ -148,10 +137,8 @@ async def launch_pka(lab_id: str, file_path: str | None) -> dict:
 
 
 def terminate_pt(lab_id: str) -> dict:
-    """Kill the tracked PT process for this lab without giving PT a chance
-    to show its 'Save changes?' dialog. Idempotent: if the process already
-    exited or was never tracked, returns success with a code so the
-    caller can log/ignore."""
+    """Kill the tracked PT process without triggering its Save dialog.
+    Idempotent — returns success with a code if the process is already gone."""
     with _pt_lock:
         _drop_exited_locked()
         process = _pt_processes.pop(lab_id, None)
@@ -160,9 +147,7 @@ def terminate_pt(lab_id: str) -> dict:
     if process.poll() is not None:
         return {"success": True, "code": "ALREADY_EXITED"}
     try:
-        # On Windows, terminate() = TerminateProcess (no save dialog).
-        # On POSIX, terminate() = SIGTERM. Both bypass PT's UI prompt.
-        process.terminate()
+        process.terminate()  # Windows: TerminateProcess; POSIX: SIGTERM
         logger.bind(name="app").info(f"terminated PT for {lab_id} (PID {process.pid})")
         return {"success": True, "code": "TERMINATED"}
     except Exception:

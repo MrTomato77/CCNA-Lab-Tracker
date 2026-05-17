@@ -18,10 +18,8 @@ async def _add_column_if_missing(
     col: str,
     decl: str,
 ) -> None:
-    """PRAGMA-driven additive migration. The previous try/except-OperationalError
-    pattern swallowed real failures (locked DB, disk full, schema corruption)
-    as if they were "duplicate column" -- leaving the app running on a half-
-    migrated schema. Pre-checking the column list lets real errors propagate."""
+    """PRAGMA-driven additive migration — pre-checks column list so real errors
+    (locked DB, disk full) propagate instead of being swallowed as duplicates."""
     if table not in _ALLOWED_MIGRATION_TABLES or not col.isidentifier():
         raise ValueError(f"Unexpected table/col: {table!r}.{col!r}")
     cur  = await db.execute(f"PRAGMA table_info({table})")
@@ -41,9 +39,6 @@ async def get_db() -> aiosqlite.Connection:
 
 async def _run_schema_migrations(db: aiosqlite.Connection) -> None:
     await db.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-    # Idempotent additive migrations. CREATE TABLE IF NOT EXISTS won't add
-    # columns to an existing table, so check via PRAGMA table_info and only
-    # ALTER when the column is absent. Real errors propagate.
     await _add_column_if_missing(db, "labs", "docs_path",         "TEXT DEFAULT NULL")
     await _add_column_if_missing(db, "labs", "difficulty",        "INTEGER DEFAULT NULL")
     await _add_column_if_missing(db, "labs", "estimated_minutes", "INTEGER DEFAULT NULL")
@@ -54,10 +49,8 @@ async def _run_schema_migrations(db: aiosqlite.Connection) -> None:
 
 
 async def _cleanup_stale_attempts(db: aiosqlite.Connection) -> None:
-    # Zombie-session cleanup: if the last run crashed mid-timer, an attempts
-    # row with duration IS NULL would "resume" on next load as a multi-day
-    # timer and add bogus hours to time_spent. Delete stale open sessions; we
-    # can't verify their duration, so don't credit any time.
+    # Zombie-session guard: a crash mid-timer leaves duration IS NULL, which
+    # would resume as a multi-day timer. Delete without crediting time.
     await db.execute("DELETE FROM attempts WHERE duration IS NULL")
 
 
@@ -69,10 +62,8 @@ async def _seed_if_empty(db: aiosqlite.Connection) -> None:
 
 
 async def _sync_asset_paths(db: aiosqlite.Connection) -> None:
-    # Auto-detect per-lab PDFs in docs/ and .pka files in labs/. Lets the
-    # user run scripts/split_pdf.py / drop new files in either folder and
-    # have docs_path / file_path populated on next restart without a
-    # separate import step. Also self-heals if either folder gets renamed.
+    # Auto-detect PDFs in docs/ and .pka in labs/ on each startup — no
+    # manual import step needed after running split_pdf.py or dropping files.
     project_root = Path(__file__).parent.parent
     docs_dir = project_root / "docs"
     labs_dir = project_root / "labs"
@@ -98,7 +89,7 @@ async def init_db() -> None:
         if _db is not None:
             return
         _db = await aiosqlite.connect(DB_PATH)
-        _db.row_factory = aiosqlite.Row   # access columns as row["name"]
+        _db.row_factory = aiosqlite.Row
         await _db.execute("PRAGMA journal_mode=WAL")
         await _db.execute("PRAGMA foreign_keys=ON")
         await _run_schema_migrations(_db)

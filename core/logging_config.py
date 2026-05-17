@@ -1,17 +1,8 @@
 """Unified server logging.
 
-Configures loguru as the single sink for the whole app and routes stdlib
-`logging` records (Robyn, Actix, anything else third-party) through the same
-formatter so the console has one consistent look.
-
-Call `setup_logging()` exactly once at process startup, BEFORE Robyn() is
-instantiated — Robyn registers its `robyn.logger` handler on import, so
-hijacking has to happen first.
-
-# TODO: services/pt_launcher.py, services/file_importer.py, database/seed.py
-# all call `logger.info(...)` without `.bind(name=...)`, so they fall back to
-# the "app" tag. Sharper console = wrap each module's logger with a per-module
-# binding. Out of scope here.
+Routes all stdlib logging (Robyn, Actix, third-party) through loguru.
+Call setup_logging() once at startup BEFORE Robyn() is instantiated —
+Robyn registers its robyn.logger handler on import, so the hijack must happen first.
 """
 
 import logging
@@ -47,12 +38,9 @@ class InterceptHandler(logging.Handler):
             level = logger.level(record.levelname).name
         except ValueError:
             level = record.levelno
-        # "robyn.logger" / "actix_server.builder" → "robyn" / "actix_server"
-        short = record.name.split(".")[0]
-        # Don't pass depth= to opt() — the depth needed to climb out of stdlib
-        # logging varies (5–9 frames depending on call path), and overshooting
-        # raises "call stack is not deep enough". Caller info is irrelevant
-        # here anyway — `extra[name]` already says where the record came from.
+        short = record.name.split(".")[0]  # "robyn.logger" → "robyn"
+        # Don't pass depth= to opt() — the climb depth varies (5-9 frames) and
+        # overshooting raises "call stack is not deep enough".
         logger.bind(name=short).opt(exception=record.exc_info).log(level, msg)
 
 
@@ -71,15 +59,11 @@ def setup_logging() -> None:
             "<level>{message}</level>"
         ),
     )
-    # Default `extra[name]` so direct loguru callers (no .bind) don't KeyError
-    # on the format string's {extra[name]} field.
+    # Default extra[name] so callers without .bind() don't KeyError on the format string.
     logger.configure(extra={"name": "app"})
 
-    # Force Robyn's logger module to import NOW so its module-level code (which
-    # attaches a colored StreamHandler to "robyn.logger") runs before our
-    # hijack below. If we skip this, Robyn() gets instantiated later, imports
-    # `robyn.logger` lazily, and re-attaches its StreamHandler on top of our
-    # InterceptHandler — restoring the noisy raw output we tried to suppress.
+    # Force robyn.logger to import now so its module-level StreamHandler runs
+    # before our hijack — otherwise Robyn() lazily re-attaches it on top of us.
     try:
         import robyn.logger  # noqa: F401
     except ImportError:
@@ -89,7 +73,6 @@ def setup_logging() -> None:
             stacklevel=2,
         )
 
-    # Hijack stdlib logging.
     logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
     for name in (
         "robyn",
@@ -103,7 +86,4 @@ def setup_logging() -> None:
         lg = logging.getLogger(name)
         lg.handlers = [InterceptHandler()]
         lg.propagate = False
-        # WARNING cuts INFO chatter at the source — saves the filter from
-        # running on every "Added route" record and protects us from any
-        # future Robyn INFO line the filter doesn't know about yet.
-        lg.setLevel(logging.WARNING)
+        lg.setLevel(logging.WARNING)  # cut INFO chatter at source

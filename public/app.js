@@ -140,8 +140,6 @@ const Transitions = Object.freeze({
 window.Transitions = Transitions;
 
 // ── Fetch wrapper ─────────────────────────────────────────────────────────
-// All POST sites used to repeat the same `headers` + `JSON.stringify` body
-// shape. Wrap once. GET keeps working — pass no body, returns parsed JSON.
 async function api(path, { method = 'GET', body = null } = {}) {
   const opts = { method };
   if (body !== null) {
@@ -153,11 +151,7 @@ async function api(path, { method = 'GET', body = null } = {}) {
 }
 
 // ── Time formatting ───────────────────────────────────────────────────────
-// One helper, three render modes — replaces the three near-duplicates that
-// used to live on appShell, labCard, and statsPage.
-//   'clock'   → "HH:MM:SS"   (timer display)
-//   'compact' → "4h 32m"     (totals)
-//   'rich'    → "4ʰ 32ᵐ"     (stats blocks, with <sup> markup)
+// mode: 'clock' → "HH:MM:SS" | 'compact' → "4h 32m" | 'rich' → "4<sup>h</sup> 32<sup>m</sup>"
 function formatTime(s = 0, mode = 'clock') {
   s = Math.max(0, s | 0);
   const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
@@ -166,9 +160,6 @@ function formatTime(s = 0, mode = 'clock') {
   return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
 }
 
-// Alpine store — single source of truth for summary so any component can
-// trigger a refresh after a mutation (status change, timer stop) and the
-// dashboard progress bar / analytics page pick it up immediately.
 document.addEventListener("alpine:init", () => {
   Alpine.store("app", {
     summary: { done:0, in_progress:0, not_started:0, total:51,
@@ -194,8 +185,6 @@ document.addEventListener("alpine:init", () => {
     cancel() { if (this.resolve) this.resolve(false); this.open = false; }
   });
 
-  // Cheat-sheet popup. Separate from the confirm modal above because the
-  // body is structured content (4 optional sections), not a single message.
   Alpine.store("summaryModal", {
     open: false,
     lab: null,
@@ -238,16 +227,10 @@ window.appShell = function() {
     statusOpen: false,
     theme: document.documentElement.getAttribute("data-theme") || "light",
     categories: CATEGORIES,
-    // FLIP orchestrator for filter-list transitions. Created lazily in
-    // init() because Transitions.filterList queries the DOM and the
-    // .cards-grid container has to exist first.
-    _flip: null,
+    _flip: null,  // created lazily in init() after .cards-grid exists
 
     get summary() { return this.$store.app.summary; },
 
-    // Route filter mutations through one method so we get a consistent
-    // snapshot → mutate → play cycle. Each call site only needs to pass
-    // the updater; the orchestrator handles everything else.
     setFilter(updater) {
       if (!this._flip) this._flip = Transitions.filterList('.cards-grid');
       this._flip.snapshot();
@@ -258,20 +241,16 @@ window.appShell = function() {
     async init() {
       await this.fetchLabs();
       window.addEventListener("refresh-labs", () => this.fetchLabs());
-      // Lightweight per-status sync so categoryDone() reflects just-
-      // stopped labs without a full /api/labs refetch. labCard owns
-      // its own spread copy of the lab object, so without this patch
-      // the appShell's labs[] would lag behind until next page load.
+      // Sync appShell.labs[] status without a full refetch — labCard owns
+      // a spread copy, so the shell would lag behind until next page load.
       window.addEventListener("lab-status-changed", (e) => {
         const row = this.labs.find(l => l.id === e.detail.id);
         if (row) row.status = e.detail.status;
       });
     },
 
-    // True when the category has >= 1 lab and every one of them is
-    // done. Used by the filter chip class binding to turn the chip
-    // green at-a-glance. Pass empty string for "All" → returns false
-    // (the All chip handles its own all-done check inline).
+    // True when every lab in the category is done — turns the chip green.
+    // Empty string ("All") always returns false; the All chip checks inline.
     categoryDone(cat) {
       if (!cat) return false;
       const rows = this.labs.filter(l => l.category === cat);
@@ -282,7 +261,6 @@ window.appShell = function() {
       this.theme = this.theme === "light" ? "dark" : "light";
       document.documentElement.setAttribute("data-theme", this.theme);
       try { localStorage.setItem("theme", this.theme); } catch (e) { /* ignore */ }
-      // Re-render chart with new theme colors if present
       if (this.page === "stats") {
         window.dispatchEvent(new CustomEvent("theme-changed"));
       }
@@ -320,9 +298,6 @@ window.appShell = function() {
       }
     },
 
-    // Predicate form (used by x-show on each card so Alpine can transition
-    // entering/leaving cards). The old filteredLabs getter is gone — cards
-    // stay in DOM and are toggled via x-show/x-transition for fade in/out.
     matchesFilter(lab) {
       if (this.filterCat && lab.category !== this.filterCat) return false;
       if (this.hideStatus === 'done'   && lab.status === STATUS.DONE) return false;
@@ -344,11 +319,8 @@ window.labCard = function(initialLab) {
     interval: null,
 
     init() {
-      // Resume an open timer session if one exists. open_session_started_at is
-      // delivered inline with GET /api/labs via correlated subquery.
-      // The cap guards against laptop-sleep / clock-drift / zombie sessions
-      // that slipped past startup cleanup — better to drop those than to
-      // credit bogus hours.
+      // Resume open timer if present. Cap guards against laptop-sleep / clock-drift
+      // / zombie sessions that slipped past startup cleanup.
       if (!this.lab.open_session_started_at) return;
       const started = new Date(this.lab.open_session_started_at);
       const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
@@ -359,12 +331,8 @@ window.labCard = function(initialLab) {
       this.interval = setInterval(() => this.tickElapsed(), 1000);
     },
 
-    // Display value, recomputed from sessionStart so the on-card timer
-    // always matches what stopTimer will save. Skipped while the card is
-    // hidden by filter or page switch (x-show → display:none →
-    // offsetParent null) — no DOM update for an invisible HH:MM:SS — but
-    // the next tick after the card becomes visible snaps elapsed back to
-    // the true wall clock. No drift, no surprise.
+    // Skipped while the card is hidden (offsetParent null) — avoids DOM
+    // updates for invisible timers; snaps to wall clock on next visible tick.
     tickElapsed() {
       if (this.$el && this.$el.offsetParent === null) return;
       this.elapsed = Math.floor((Date.now() - this.sessionStart.getTime()) / 1000);
@@ -375,7 +343,6 @@ window.labCard = function(initialLab) {
       this.sessionStart = new Date();
       this.elapsed = 0;
       this.running = true;
-      // Persist open session immediately (duration=0 = signal for open)
       await api(`/api/labs/${this.lab.id}/timer`, {
         method: "POST",
         body: { started_at: this.sessionStart.toISOString(), duration: 0 },
@@ -388,10 +355,8 @@ window.labCard = function(initialLab) {
       if (!this.running) return;
       clearInterval(this.interval);
       this.running = false;
-      // Wall clock, not the (pausable) tick counter — see tickElapsed.
-      // Capped at 8h to match init()'s zombie-session guard so a forgot-
-      // to-stop session doesn't credit absurd hours. Math.max guards
-      // against system-clock skew (NTP correction running backward).
+      // Wall clock (not tick counter) capped at 8h — matches init()'s zombie
+      // guard. Math.max guards against NTP corrections running backward.
       const wall = Math.floor((Date.now() - this.sessionStart.getTime()) / 1000);
       const duration = Math.max(0, Math.min(wall, TIMER_RESUME_CAP_SEC));
       try {
@@ -401,12 +366,9 @@ window.labCard = function(initialLab) {
         });
         if (json.success) {
           this.lab.time_spent = json.data.time_spent;
-          // Auto-mark done after stop (per user-confirmed launch flow)
           this.lab.status = STATUS.DONE;
           await this.updateStatus(STATUS.DONE);
-          // Close PT after the save lands. A close failure is non-fatal —
-          // the timer is already saved, so surface a soft warning and let
-          // the user close PT themselves rather than blocking the flow.
+          // Close PT — non-fatal if it fails; timer is already saved.
           try {
             const closeRes = await api(`/api/labs/${this.lab.id}/close`, { method: "POST" });
             if (!closeRes.success) {
@@ -609,12 +571,8 @@ window.statsPage = function() {
         const slowest   = slow.data;
         this._slowest   = slowest;
         this.loading    = false;
-        // x-if unmounts the chart container while loading=true, so we must
-        // wait for the next DOM tick before grabbing the canvas element.
-        await this.$nextTick();
+        await this.$nextTick();  // x-if unmounts canvas while loading=true
         this.renderChart(slowest);
-        // Bind once at module scope — palette tokens come from CSS vars at
-        // render time, so a destroy-and-recreate gives us fresh colours.
         bindStatsThemeListener(() => this);
       } catch (e) {
         console.error("Stats load failed:", e);
@@ -626,8 +584,6 @@ window.statsPage = function() {
       const el = document.getElementById("timeChart");
       if (!el) return;
       if (this.chart) this.chart.destroy();
-      // Pull palette from current CSS variables so dark/light themes stay
-      // consistent without hard-coding hex codes here.
       const css = getComputedStyle(document.documentElement);
       const accent = css.getPropertyValue("--accent").trim() || "#1d8fc7";
       const accentRgb = css.getPropertyValue("--accent-rgb").trim() || "29, 143, 199";
@@ -672,11 +628,8 @@ window.statsPage = function() {
 }
 
 // ── Stats theme-listener (one-time bind) ─────────────────────────────
-// statsPage.load() runs every time the user navigates to /stats. Binding
-// the `theme-changed` listener inline there leaked one listener per visit
-// — five visits = five chart redraws on a single theme toggle. Hoist the
-// registration to module scope behind a guard so it fires exactly once,
-// then poll back to whatever statsPage instance is currently mounted.
+// Hoisted to module scope so repeated /stats navigation doesn't leak one
+// listener per visit (five visits = five redraws per theme toggle).
 let _statsRef = null;
 let _statsThemeBound = false;
 function bindStatsThemeListener(getCurrent) {

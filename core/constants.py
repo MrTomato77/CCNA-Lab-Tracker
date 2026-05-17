@@ -36,10 +36,8 @@ CATEGORIES: tuple[str, ...] = (
     "Security & Advanced",
 )
 
-# Per-lab difficulty (1-5). Editorial data — moved here from
-# scripts/extract_metadata.py so seed and the metadata sync script share one
-# source. PDF extraction was unreliable across nested clip groups; the
-# numbers come from the lab booklet's printed star ratings.
+# Editorial difficulty ratings (1-5) from the booklet's printed stars.
+# PDF extraction was unreliable; these are shared by seed.py and extract_metadata.py.
 DIFFICULTY: dict[str, int] = {
     "LAB-01": 1, "LAB-02": 1, "LAB-03": 1, "LAB-04": 1, "LAB-05": 1,
     "LAB-06": 1, "LAB-07": 1, "LAB-08": 1, "LAB-09": 3, "LAB-10": 1,

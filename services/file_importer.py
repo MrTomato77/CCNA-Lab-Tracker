@@ -10,24 +10,14 @@ from database.connection import get_db
 LABS_FILES_DIR = Path(__file__).parent.parent / "labs"
 ALLOWED_IMPORT_ROOT = Path(os.getenv("CCNA_IMPORT_ROOT", str(Path.home()))).resolve()
 
-# Real .pka files are ~1–5 MB. A 100 MB ceiling rejects ZIP-bomb-style
-# uploads and accidental drops of large unrelated files (videos, ISOs)
-# without cramping any legitimate Packet Tracer save.
+# 100 MB cap: rejects ZIP bombs / large unrelated files; real .pka files are ~1-5 MB.
 _MAX_FILE_BYTES = 100 * 1024 * 1024
 _MAX_FILE_MB = _MAX_FILE_BYTES // (1024 * 1024)
 
 def extract_lab_id(filename: str) -> str | None:
-    """
-    Extract LAB-XX from irregular filenames:
-      'LAB-07 VLAN and Trunking.pka'
-      'LAB-21-IPv4 Static and Default Route.pka'  (extra dash)
-      'LAB-49 DHCP Snooing.pka'                   (typo — still matches)
-    Returns 'LAB-07' (zero-padded) or None.
-
-    Numbers outside 1..51 (the seeded range) return None so a junk file
-    like 'LAB-99.pka' fails the import with a clear "skipped" reason
-    instead of slipping through and orphaning a row in `labs`.
-    """
+    """Extract LAB-XX from irregular filenames (e.g. 'LAB-07 VLAN.pka', 'LAB-21-IPv4.pka').
+    Returns zero-padded 'LAB-07' or None. Numbers outside 1..51 return None
+    so junk files like 'LAB-99.pka' are skipped cleanly."""
     match = re.search(r'\bLAB[-\s]?(\d{1,2})\b', filename, re.IGNORECASE)
     if not match:
         return None
@@ -91,7 +81,6 @@ async def _update_db(lab_id: str, path: Path) -> None:
     await db.commit()
 
 async def import_from_bytes(filename: str, content: bytes) -> dict:
-    """Browser upload — write bytes async."""
     lab_id, validation_failure = _validate_filename(filename)
     if validation_failure:
         return validation_failure
@@ -110,7 +99,6 @@ async def import_from_bytes(filename: str, content: bytes) -> dict:
         return _result(filename, "error", lab_id=lab_id, reason=str(e))
 
 async def import_single_file(src: Path) -> dict:
-    """Folder scan — copy file with shutil (sync, acceptable for one-time copy)."""
     if src.suffix.lower() != ".pka":
         return _result(src.name, "skipped", reason="Not a .pka file")
     lab_id, validation_failure = _validate_filename(src.name)
@@ -142,9 +130,8 @@ async def import_from_folder(folder_path: str) -> list[dict]:
         raise ValueError(f"folder_path must be inside {ALLOWED_IMPORT_ROOT}") from exc
     if not folder.exists() or not folder.is_dir():
         raise ValueError(f"Folder not found: {folder_path}")
-    # Drop symlinks before iterating — rglob() follows them silently and
-    # would let a hostile drop-folder pull `.pka`-named symlinks pointing
-    # anywhere on disk into the import pipeline.
+    # Drop symlinks — rglob() follows them silently and could pull
+    # .pka-named symlinks pointing anywhere on disk into the pipeline.
     pka_files = []
     for f in folder.rglob("*.pka"):
         if f.is_symlink():

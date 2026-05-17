@@ -1,14 +1,10 @@
 """Sync lab metadata (difficulty + estimated time) into the DB.
 
-Run from the project root after scripts/split_pdf.py:
+Run from project root after scripts/split_pdf.py:
     python scripts/extract_metadata.py
 
-Re-running is safe: rows are updated in place.
-
-Difficulty is editorial data and lives in `core/constants.py` (PDF star
-extraction was unreliable across nested clip groups, so the values come
-from the lab booklet's printed star ratings). Time, on the other hand, is
-reliably extractable from the text layer.
+Re-running is safe. Difficulty comes from core/constants.py (PDF star
+extraction was unreliable); time is parsed from the text layer.
 """
 
 import asyncio
@@ -21,10 +17,7 @@ import aiosqlite
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-# Make the project root importable so `core.constants` resolves when the
-# script is invoked as `python scripts/extract_metadata.py` from the repo
-# root (no package install).
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent.parent  # project root for non-installed invocation
 sys.path.insert(0, str(ROOT))
 
 from core.constants import DIFFICULTY  # noqa: E402
@@ -41,11 +34,7 @@ log = logging.getLogger(__name__)
 
 
 def extract_page1(pdf_path: Path) -> tuple[int | None, int | None]:
-    """Return (difficulty 1-5, estimated_minutes) for a lab PDF.
-
-    Difficulty comes from the editorial DIFFICULTY table (above).
-    Estimated minutes is parsed from the page-1 text layer.
-    """
+    """Return (difficulty 1-5, estimated_minutes) from the lab PDF."""
     lab_id = pdf_path.stem
     difficulty = DIFFICULTY.get(lab_id)
 
@@ -79,7 +68,7 @@ async def main() -> int:
     log.info("Scanning %s PDFs in %s/", len(pdfs), DOCS_DIR.name)
 
     async with aiosqlite.connect(DB_PATH) as db:
-        for col_name, col_def in [
+        for col_name, col_def in [  # idempotent — only adds if missing
             ("difficulty", "INTEGER DEFAULT NULL"),
             ("estimated_minutes", "INTEGER DEFAULT NULL"),
         ]:
@@ -88,7 +77,7 @@ async def main() -> int:
 
         updated = skipped = 0
         for pdf in pdfs:
-            lab_id = pdf.stem              # "LAB-01"
+            lab_id = pdf.stem
             difficulty, minutes = extract_page1(pdf)
 
             tag = f"diff={difficulty}  time={minutes}m"

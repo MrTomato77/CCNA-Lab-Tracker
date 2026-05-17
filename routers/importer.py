@@ -14,8 +14,7 @@ async def upload_files(request: Request) -> dict | ErrorResponse:
         return api_error("No files received.", "NO_FILES", 400)
 
     results = []
-    # Auto-detect Robyn multipart version
-    if isinstance(files_raw, dict):
+    if isinstance(files_raw, dict):  # Robyn multipart shape varies by version
         items = files_raw.values()
     else:
         items = files_raw if isinstance(files_raw, (list, tuple)) else [files_raw]

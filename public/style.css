@@ -1,8 +1,4 @@
-/* ──────────────────────────────────────────────────────────────────────────
-   CCNA Lab Tracker — Supa-Resume v3
-   Outfit (everything) + JetBrains Mono (timer only)
-   Light + Dark themes via [data-theme] on <html>
-   ────────────────────────────────────────────────────────────────────────── */
+/* CCNA Lab Tracker — Outfit (UI) + JetBrains Mono (timer) — light/dark via [data-theme] */
 
 /* ── Light (default) ──────────────────────────────────────────────────── */
 :root,
@@ -90,10 +86,8 @@
   --font-sans:    "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono:    "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  /* Transition system — single source of truth, mirrored in window.Transitions
-     (see app.js top). Components that schedule follow-up work in JS (toasts,
-     chart rerenders) should read from window.Transitions so the values can't
-     drift away from these CSS variables. */
+  /* Transition system — mirrored in window.Transitions (app.js). JS follow-ups
+     (toasts, chart rerenders) read from there so values can't drift. */
   --tx-duration-fast:    120ms;
   --tx-duration-normal:  200ms;
   --tx-duration-slow:    320ms;
@@ -124,7 +118,6 @@ button { font-family: inherit; color: inherit; background: none; border: none; c
 input, select, textarea { font-family: inherit; color: inherit; }
 a { color: inherit; text-decoration: none; }
 
-/* All interactive surfaces — smooth transitions */
 .lab-card, .filter-chip, .nav-tab, .btn-action, .btn-docs, .btn-brief,
 .btn-card-reset, .btn-primary, .theme-toggle, .nav-reset,
 .status-filter, .status-option, .folder-input, .stat-card {
@@ -339,9 +332,7 @@ a { color: inherit; text-decoration: none; }
   border-color: var(--accent-tint);
   font-weight: 600;
 }
-/* All labs in this category are done — glance signal that the
-   category is complete. Reuses the same --done* tokens as
-   .lab-card--done so light/dark theming carries over automatically. */
+/* Category fully done — green glance signal using --done* tokens. */
 .filter-chip--done {
   background:    var(--done-tint);
   color:         var(--done);
@@ -352,10 +343,6 @@ a { color: inherit; text-decoration: none; }
   color:         var(--done);
   border-color:  var(--done);
 }
-/* Match the .filter-chip.active recipe — soft tinted fill + bold
-   text. Active state reads through font weight and a border that
-   merges into the bg, instead of a saturated fill that looked too
-   heavy in light mode and too bright in dark. */
 .filter-chip--done.active {
   background:    var(--done-tint);
   color:         var(--done);
@@ -420,9 +407,7 @@ a { color: inherit; text-decoration: none; }
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* Anchor for absolute-positioned leaving cards — see
-     window.Transitions.setupLeaveAnchor() in app.js. */
-  position: relative;
+  position: relative;  /* anchor for absolute-positioned leaving cards */
 }
 
 /* ── Lab card ─────────────────────────────────────────────────────────── */
@@ -438,11 +423,6 @@ a { color: inherit; text-decoration: none; }
   border-radius: var(--radius-card);
 }
 
-/* Filter chip / dropdown click → cards crossfade. The staggered-delay
-   workaround that used to live here just hid the symptom; the real fix
-   is layout-level: leaving cards are pinned to position:absolute by the
-   Transitions service so they drop out of flow immediately. Incoming
-   cards land in their final slots from frame 1 — no spawn-then-snap. */
 .card-fade-enter {
   transition: opacity var(--tx-duration-normal) var(--tx-easing-default);
 }
@@ -595,10 +575,6 @@ a { color: inherit; text-decoration: none; }
   padding-left: 20px;
 }
 
-/* Inline SVG glyph that sits to the right of a button label
-   (Brief 📖, Docs 📄). Uses currentColor so it tints with the
-   button text, and a small left margin separates it from the
-   word. Slightly dimmed to read as an accent. */
 .btn-icon {
   display: inline-block;
   vertical-align: -2px;
@@ -606,10 +582,6 @@ a { color: inherit; text-decoration: none; }
   opacity: 0.72;
 }
 
-/* Vertical divider between secondary buttons (Brief, Docs) and the
-   primary CTA (Launch / Stop / Done). Mirrors the divider between
-   the timer column and the action column, reinforcing the
-   "primary action stands apart" hierarchy. */
 .action-sep {
   width: 1px;
   align-self: stretch;
@@ -712,8 +684,6 @@ a { color: inherit; text-decoration: none; }
 .btn-docs:hover { color: var(--accent); background: var(--accent-tint); }
 .btn-docs:disabled { color: var(--text-4); cursor: not-allowed; background: transparent; }
 
-/* Brief — sibling of btn-docs; faint border distinguishes it from
-   the borderless docs link without competing visually. */
 .btn-brief {
   color: var(--text-2);
   background: transparent;
@@ -730,21 +700,14 @@ a { color: inherit; text-decoration: none; }
   border-color: var(--accent-tint);
 }
 
-/* Summary modal — wider than the confirm modal, scrollable body.
-   overflow-x:hidden + overflow-wrap on the cmd pill ensures long
-   commands wrap inside the modal instead of triggering h-scroll. */
-/* Compound selector raises specificity over the base .modal rule
-   (which sets max-width: 400px further down in this file).
-   position:relative gives the absolute-positioned close button an
-   anchor at the top-right corner. */
+/* Compound selector raises specificity over .modal (max-width: 400px).
+   position:relative anchors the absolute close button. */
 .modal.summary-modal {
   max-width: 720px;
   width: 92vw;
   position: relative;
 }
 
-/* X close button in the top-right corner. Replaces the bottom
-   "Close" button — Esc and backdrop click still close the modal too. */
 .btn-modal-close {
   position: absolute;
   top: 14px;
@@ -777,11 +740,7 @@ a { color: inherit; text-decoration: none; }
   overflow-y: auto;
   overflow-x: hidden;
   margin: 12px 0;
-  /* Subtle scrollbar that matches the theme. Firefox honors the
-     two scrollbar-* properties; Chromium/WebKit honor the pseudo-
-     elements below. Both render a thin, rounded thumb on a
-     transparent track — no chunky OS scrollbar in the modal. */
-  scrollbar-width: thin;
+  scrollbar-width: thin;  /* Firefox */
   scrollbar-color: var(--border-2) transparent;
 }
 .summary-body::-webkit-scrollbar {
@@ -802,9 +761,7 @@ a { color: inherit; text-decoration: none; }
   padding: 18px 0;
   border-top: 1px solid var(--border);
 }
-/* Alpine <template> elements sit between sections in the DOM, so
-   :first-child never matches. Use :first-of-type so the topmost
-   visible section drops its divider. */
+/* Alpine <template> nodes prevent :first-child — :first-of-type drops the divider correctly. */
 .summary-body section:first-of-type {
   padding-top: 0;
   border-top: none;
@@ -824,11 +781,6 @@ a { color: inherit; text-decoration: none; }
   font-size: 13px;
 }
 
-/* Inline cmd + note: pill and note flow on the same line when the
-   note fits; when the pill consumes the row width, the note text
-   wraps naturally to the next line inside the same <li>. No flex,
-   so the previous "stranded note at row start" disconnect can't
-   recur. */
 .cmd-list, .gotcha-list {
   list-style: none;
   margin: 0;
