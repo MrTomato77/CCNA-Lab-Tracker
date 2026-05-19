@@ -5,3 +5,4 @@ loguru
 python-dotenv
 aiofiles
 pypdf
+python-docx>=1.2
