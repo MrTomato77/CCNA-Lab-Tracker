@@ -12,7 +12,7 @@ import aiofiles
 from robyn import Robyn, Request, Response
 from loguru import logger
 from database.connection import init_db, close_db
-from routers import labs, progress, launcher, stats, importer
+from routers import labs, progress, launcher, stats, importer, quiz
 
 app = Robyn(__file__)
 
@@ -93,6 +93,7 @@ app.include_router(progress.router)
 app.include_router(launcher.router)
 app.include_router(stats.router)
 app.include_router(importer.router)
+app.include_router(quiz.router)
 
 # No CORS — same-origin app (browser + server both at localhost:8080).
 # Log only in before_request: Robyn 0.64 runs before/after in separate tasks

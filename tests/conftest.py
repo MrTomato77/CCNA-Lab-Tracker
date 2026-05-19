@@ -24,6 +24,8 @@ async def tmp_db():
     db.row_factory = aiosqlite.Row
     schema = (REPO_ROOT / "database" / "schema.sql").read_text(encoding="utf-8")
     await db.executescript(schema)
+    quiz_schema = (REPO_ROOT / "database" / "quiz_schema.sql").read_text(encoding="utf-8")
+    await db.executescript(quiz_schema)
     await db.commit()
 
     saved, conn_mod._db = conn_mod._db, db
