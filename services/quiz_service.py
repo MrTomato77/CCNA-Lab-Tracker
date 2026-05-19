@@ -7,7 +7,6 @@ module never imports from `services/lab_service.py` or vice-versa.
 from __future__ import annotations
 
 import json
-import random
 from datetime import datetime, timezone
 from typing import Any
 
@@ -15,10 +14,16 @@ from core.exam_pools import POOL_ALL, POOL_LABELS, POOL_VALUES, SESSION_POOL_VAL
 from core.responses import ErrorResponse, api_error
 from database.connection import get_db
 
+ALREADY_ANSWERED = {"already_answered": True}
+"""Sentinel returned by ``submit_answer`` when the question was already
+answered in this session — the router maps it to 409."""
+
+_ISO_FMT = "%Y-%m-%dT%H:%M:%SZ"
+
 
 def _now_iso() -> str:
     """ISO-8601 UTC second-resolution, e.g. ``2026-05-19T12:34:56Z``."""
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(timezone.utc).strftime(_ISO_FMT)
 
 
 async def list_pools() -> list[dict[str, Any]]:
@@ -48,6 +53,8 @@ async def list_pools() -> list[dict[str, Any]]:
 
 async def start_session(pool: str) -> int:
     """Open a session for *pool*; return its id."""
+    if pool not in SESSION_POOL_VALUES:
+        raise ValueError(f"invalid pool {pool!r}")
     db = await get_db()
     cur = await db.execute(
         "INSERT INTO quiz_sessions (pool, started_at) VALUES (?, ?)",
@@ -82,18 +89,24 @@ async def next_question(session_id: int) -> dict[str, Any] | None:
     """Pick a random unseen quizable question for *session_id*.
 
     Returns the question payload without leaking the correct answer, or
-    `None` when the session has exhausted its pool.
+    `None` when the session has exhausted its pool. The router must have
+    already verified the session exists via ``require_session`` — this
+    function assumes the session row is valid.
     """
     db = await get_db()
     session = await _session_row(session_id)
     if session is None:
-        return None
+        # Router pre-check should make this unreachable; raise loudly so
+        # a corrupted session can't be mistaken for an exhausted pool.
+        raise LookupError(f"session {session_id} disappeared")
 
     pool = session["pool"]
-    pool_filter = "" if pool == POOL_ALL else "AND q.pool = ?"
-    params: tuple[Any, ...] = (
-        (session_id, pool) if pool != POOL_ALL else (session_id,)
-    )
+    if pool == POOL_ALL:
+        pool_filter = ""
+        params: tuple[Any, ...] = (session_id,)
+    else:
+        pool_filter = "AND q.pool = ?"
+        params = (session_id, pool)
 
     sql = f"""
         SELECT q.id, q.prompt_en, q.prompt_th, q.choices_json,
@@ -104,13 +117,14 @@ async def next_question(session_id: int) -> dict[str, Any] | None:
                SELECT question_id FROM quiz_answers WHERE session_id = ?
            )
            {pool_filter}
+         ORDER BY RANDOM()
+         LIMIT 1
     """
     async with db.execute(sql, params) as cur:
-        rows = await cur.fetchall()
-    if not rows:
+        picked = await cur.fetchone()
+    if picked is None:
         return None
 
-    picked = random.choice(rows)
     correct_count = len(json.loads(picked["correct_labels"]))
     return {
         "question_id":  picked["id"],
@@ -132,9 +146,12 @@ async def submit_answer(
 ) -> dict[str, Any] | None:
     """Persist an answer and return correctness + reveal info.
 
-    Returns `None` if the question doesn't exist or has already been
-    answered in this session — the second submission is ignored so a
-    repeated POST can't inflate `total_correct`.
+    Returns:
+        * ``None`` if the question doesn't exist
+        * ``ALREADY_ANSWERED`` (sentinel dict) if the question has been
+          answered in this session — the second submission is ignored
+          so a repeated POST can't inflate ``total_correct``
+        * ``{is_correct, correct_labels, explanation}`` on success
     """
     db = await get_db()
     async with db.execute(
@@ -150,10 +167,16 @@ async def submit_answer(
         (session_id, question_id),
     ) as cur:
         if await cur.fetchone() is not None:
-            return None
+            return ALREADY_ANSWERED
 
     correct_labels = json.loads(row["correct_labels"])
-    is_correct = sorted(selected_labels) == sorted(correct_labels)
+    if not correct_labels:
+        # Defence in depth: a quizable question must have at least one
+        # correct label. Empty would make any selection 'correct'.
+        return None
+    normalized_selected = sorted(label.upper() for label in selected_labels)
+    normalized_correct  = sorted(label.upper() for label in correct_labels)
+    is_correct = normalized_selected == normalized_correct
 
     await db.execute(
         """
@@ -223,20 +246,23 @@ async def get_summary(session_id: int) -> dict[str, Any] | None:
 
 
 def _duration_seconds(started_at: str | None, ended_at: str | None) -> int | None:
+    """Seconds between two ISO-8601 UTC timestamps stored as text."""
     if not started_at:
         return None
-    try:
-        start = datetime.strptime(started_at, "%Y-%m-%dT%H:%M:%SZ")
-    except ValueError:
+    start = _parse_iso(started_at)
+    if start is None:
         return None
     if ended_at:
-        try:
-            end = datetime.strptime(ended_at, "%Y-%m-%dT%H:%M:%SZ")
-        except ValueError:
+        end = _parse_iso(ended_at)
+        if end is None:
             return None
         return int((end - start).total_seconds())
-    return int((datetime.now(timezone.utc).replace(tzinfo=None) - start).total_seconds())
+    return int((datetime.now(timezone.utc) - start).total_seconds())
 
 
-def is_valid_session_pool(pool: str) -> bool:
-    return pool in SESSION_POOL_VALUES
+def _parse_iso(value: str) -> datetime | None:
+    """Parse ``_ISO_FMT`` text into a timezone-aware UTC datetime."""
+    try:
+        return datetime.strptime(value, _ISO_FMT).replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None

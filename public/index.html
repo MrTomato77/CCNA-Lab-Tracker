@@ -383,7 +383,7 @@
         <div class="quiz-actions">
           <button class="btn-primary btn-primary--ghost" @click="finish()">Finish session</button>
           <button class="btn-primary" x-show="!feedback"
-                  :disabled="selection.length === 0"
+                  :disabled="selection.length === 0 || submitting"
                   @click="submit()">Submit</button>
           <button class="btn-primary" x-show="feedback" @click="fetchNext()">Next →</button>
         </div>

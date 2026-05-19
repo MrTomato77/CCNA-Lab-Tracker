@@ -637,6 +637,7 @@ window.quizPage = function() {
     currentQ: null,         // {question_id, prompt_en, prompt_th, choices, multi, image_urls}
     selection: [],          // user's current label selection
     feedback: null,         // {is_correct, correct_labels, explanation} after submit
+    submitting: false,      // in-flight guard against double-click on Submit
     finalSummary: null,
 
     async init() {
@@ -647,7 +648,15 @@ window.quizPage = function() {
       this.view = "loading";
       try {
         const json = await api("/api/quiz/pools");
-        if (json.success) this.pools = json.data;
+        if (json.success) {
+          this.pools = json.data;
+        } else {
+          window.showToast("× " + (json.error || "Failed to load pools"), "error");
+          this.pools = [];
+        }
+      } catch (e) {
+        window.showToast("× Network error", "error");
+        this.pools = [];
       } finally {
         this.view = "pools";
       }
@@ -714,7 +723,8 @@ window.quizPage = function() {
     },
 
     async submit() {
-      if (!this.selection.length || this.feedback) return;
+      if (!this.selection.length || this.feedback || this.submitting) return;
+      this.submitting = true;
       try {
         const json = await api(`/api/quiz/sessions/${this.sessionId}/answers`, {
           method: "POST",
@@ -730,6 +740,8 @@ window.quizPage = function() {
         this.feedback = json.data;
       } catch (e) {
         window.showToast("× Network error", "error");
+      } finally {
+        this.submitting = false;
       }
     },
 

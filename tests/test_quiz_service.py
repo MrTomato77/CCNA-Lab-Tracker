@@ -160,12 +160,42 @@ async def test_submit_answer_rejects_double_submit_in_same_session(tmp_db):
     sid = await svc.start_session("A")
     first = await svc.submit_answer(sid, 1, ["B"])
     assert first is not None and first["is_correct"]
-    # Second submission for the same (session, question) must be rejected
-    # so totals can't be inflated by repeating the request.
-    assert await svc.submit_answer(sid, 1, ["B"]) is None
+    # Second submission for the same (session, question) returns the
+    # ALREADY_ANSWERED sentinel so the router can distinguish it from a
+    # genuinely missing question and emit a 409 instead of a 404.
+    second = await svc.submit_answer(sid, 1, ["B"])
+    assert second is svc.ALREADY_ANSWERED
     summary = await svc.get_summary(sid)
     assert summary["total_seen"] == 1
     assert summary["total_correct"] == 1
+
+
+@pytest.mark.asyncio
+async def test_submit_answer_normalises_case_before_comparing(tmp_db):
+    """The Pydantic validator uppercases incoming labels, but the service
+    layer should not silently miscompare when called directly."""
+    await _seed(tmp_db, id=1, pool="A", correct=["B"])
+    sid = await svc.start_session("A")
+    result = await svc.submit_answer(sid, 1, ["b"])
+    assert result is not None and result["is_correct"] is True
+
+
+@pytest.mark.asyncio
+async def test_next_question_returns_none_when_pool_has_only_flagged_rows(tmp_db):
+    await _seed(tmp_db, id=1, pool="A", needs_review=1)
+    sid = await svc.start_session("A")
+    assert await svc.next_question(sid) is None
+
+
+@pytest.mark.asyncio
+async def test_finish_session_returns_none_for_unknown_session(tmp_db):
+    assert await svc.finish_session(9999) is None
+
+
+@pytest.mark.asyncio
+async def test_start_session_rejects_invalid_pool(tmp_db):
+    with pytest.raises(ValueError):
+        await svc.start_session("X")
 
 
 @pytest.mark.asyncio
@@ -182,8 +212,3 @@ async def test_get_summary_returns_none_for_unknown(tmp_db):
     assert await svc.get_summary(9999) is None
 
 
-def test_is_valid_session_pool_accepts_letters_and_all():
-    for value in ("A", "B", "C", "D", "ALL"):
-        assert svc.is_valid_session_pool(value)
-    assert not svc.is_valid_session_pool("E")
-    assert not svc.is_valid_session_pool("")

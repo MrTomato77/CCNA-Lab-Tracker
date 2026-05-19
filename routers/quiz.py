@@ -68,10 +68,11 @@ async def submit_answer(request: Request) -> dict | ErrorResponse:
         return validation_error(e)
     result = await quiz_service.submit_answer(sid, data.question_id, data.selected_labels)
     if result is None:
+        return api_error("Question not found.", "QUESTION_NOT_FOUND", 404)
+    if result is quiz_service.ALREADY_ANSWERED:
         return api_error(
-            "Question not found or already answered in this session.",
-            "QUESTION_UNAVAILABLE",
-            404,
+            "Question already answered in this session.",
+            "ALREADY_ANSWERED", 409,
         )
     return ok(result)
 
@@ -92,10 +93,10 @@ async def get_summary(request: Request) -> dict | ErrorResponse:
     sid, err = _parse_session_id(request)
     if err:
         return err
-    summary = await quiz_service.get_summary(sid)
-    if summary is None:
-        return api_error("Session not found.", "SESSION_NOT_FOUND", 404)
-    return ok(summary)
+    _, err = await quiz_service.require_session(sid)
+    if err:
+        return err
+    return ok(await quiz_service.get_summary(sid))
 
 
 @router.get("/images/:filename")
@@ -120,8 +121,11 @@ async def get_image(request: Request) -> Response:
     return Response(
         status_code=200,
         headers={
-            "Content-Type":  content_type,
-            "Cache-Control": "public, max-age=86400",
+            "Content-Type":           content_type,
+            "Cache-Control":          "public, max-age=86400",
+            # Block browser content-sniffing — the declared type must be
+            # honoured even if the bytes look like HTML/SVG/anything else.
+            "X-Content-Type-Options": "nosniff",
         },
         description=data,
     )

@@ -23,7 +23,7 @@ import json
 import logging
 import re
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace as dc_replace
 from pathlib import Path
 
 import aiosqlite
@@ -330,20 +330,7 @@ async def parse_all(document: Document) -> int:
             images = extract_table_images(document, table, IMAGES_DIR, q.id)
             if images:
                 with_images_total += 1
-            q = ParsedQuestion(
-                id=q.id,
-                pool=q.pool,
-                topic=q.topic,
-                prompt_en=q.prompt_en,
-                prompt_th=q.prompt_th,
-                choices=q.choices,
-                correct_labels=q.correct_labels,
-                explanation=q.explanation,
-                source_table=q.source_table,
-                image_filenames=images,
-                needs_review=q.needs_review,
-            )
-            await upsert_question(db, q)
+            await upsert_question(db, dc_replace(q, image_filenames=images))
             parsed_total += 1
             if q.needs_review:
                 flagged_total += 1
