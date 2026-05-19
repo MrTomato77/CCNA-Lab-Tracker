@@ -4,8 +4,9 @@ import aiosqlite
 from pathlib import Path
 from loguru import logger
 
-DB_PATH    = Path(__file__).parent / "labs.db"
-SCHEMA_PATH = Path(__file__).parent / "schema.sql"
+DB_PATH          = Path(__file__).parent / "labs.db"
+SCHEMA_PATH      = Path(__file__).parent / "schema.sql"
+QUIZ_SCHEMA_PATH = Path(__file__).parent / "quiz_schema.sql"
 
 _db: aiosqlite.Connection | None = None
 _db_lock = asyncio.Lock()
@@ -39,6 +40,7 @@ async def get_db() -> aiosqlite.Connection:
 
 async def _run_schema_migrations(db: aiosqlite.Connection) -> None:
     await db.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+    await db.executescript(QUIZ_SCHEMA_PATH.read_text(encoding="utf-8"))
     await _add_column_if_missing(db, "labs", "docs_path",         "TEXT DEFAULT NULL")
     await _add_column_if_missing(db, "labs", "difficulty",        "INTEGER DEFAULT NULL")
     await _add_column_if_missing(db, "labs", "estimated_minutes", "INTEGER DEFAULT NULL")
