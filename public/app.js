@@ -627,6 +627,152 @@ window.statsPage = function() {
   }
 }
 
+// ── Quiz Page ──────────────────────────────────────────────────────────────
+window.quizPage = function() {
+  return {
+    view: "pools",          // "pools" | "loading" | "practice" | "summary"
+    pools: [],              // [{id, name, question_count}]
+    sessionId: null,
+    selectedPool: null,
+    currentQ: null,         // {question_id, prompt_en, prompt_th, choices, multi, image_urls}
+    selection: [],          // user's current label selection
+    feedback: null,         // {is_correct, correct_labels, explanation} after submit
+    finalSummary: null,
+
+    async init() {
+      await this.loadPools();
+    },
+
+    async loadPools() {
+      this.view = "loading";
+      try {
+        const json = await api("/api/quiz/pools");
+        if (json.success) this.pools = json.data;
+      } finally {
+        this.view = "pools";
+      }
+    },
+
+    async startPool(poolId) {
+      if (!poolId) return;
+      this.view = "loading";
+      this.selectedPool = poolId;
+      this.feedback = null;
+      this.selection = [];
+      try {
+        const json = await api("/api/quiz/sessions",
+          { method: "POST", body: { pool: poolId } });
+        if (!json.success) {
+          window.showToast("× " + (json.error || "Failed to start"), "error");
+          this.view = "pools";
+          return;
+        }
+        this.sessionId = json.data.session_id;
+        await this.fetchNext();
+      } catch (e) {
+        window.showToast("× Network error", "error");
+        this.view = "pools";
+      }
+    },
+
+    async fetchNext() {
+      this.view = "loading";
+      this.selection = [];
+      this.feedback = null;
+      try {
+        const json = await api(`/api/quiz/sessions/${this.sessionId}/next`);
+        if (!json.success) {
+          window.showToast("× " + json.error, "error");
+          return;
+        }
+        if (!json.data) {           // pool exhausted
+          await this.finish();
+          return;
+        }
+        this.currentQ = json.data;
+        this.view = "practice";
+      } catch (e) {
+        window.showToast("× Network error", "error");
+        this.view = "pools";
+      }
+    },
+
+    toggleChoice(label) {
+      if (this.feedback) return;    // freeze after submit
+      if (!this.currentQ.multi) {
+        this.selection = [label];
+        return;
+      }
+      const i = this.selection.indexOf(label);
+      if (i >= 0) this.selection.splice(i, 1);
+      else this.selection.push(label);
+    },
+
+    isSelected(label)     { return this.selection.includes(label); },
+    isCorrectLabel(label) {
+      return !!this.feedback && this.feedback.correct_labels.includes(label);
+    },
+
+    async submit() {
+      if (!this.selection.length || this.feedback) return;
+      try {
+        const json = await api(`/api/quiz/sessions/${this.sessionId}/answers`, {
+          method: "POST",
+          body: {
+            question_id:     this.currentQ.question_id,
+            selected_labels: this.selection,
+          },
+        });
+        if (!json.success) {
+          window.showToast("× " + json.error, "error");
+          return;
+        }
+        this.feedback = json.data;
+      } catch (e) {
+        window.showToast("× Network error", "error");
+      }
+    },
+
+    async finish() {
+      if (!this.sessionId) {
+        this.view = "pools";
+        return;
+      }
+      this.view = "loading";
+      try {
+        const json = await api(
+          `/api/quiz/sessions/${this.sessionId}/finish`, { method: "POST" });
+        if (!json.success) {
+          window.showToast("× " + json.error, "error");
+          this.view = "practice";
+          return;
+        }
+        this.finalSummary = json.data;
+        this.view = "summary";
+      } catch (e) {
+        window.showToast("× Network error", "error");
+        this.view = "practice";
+      }
+    },
+
+    async restart() {
+      const pool = this.selectedPool;
+      this.sessionId = null;
+      this.finalSummary = null;
+      await this.startPool(pool);
+    },
+
+    backToPools() {
+      this.sessionId   = null;
+      this.currentQ    = null;
+      this.finalSummary = null;
+      this.selection   = [];
+      this.feedback    = null;
+      this.loadPools();
+    },
+  };
+};
+
 // ── Stats theme-listener (one-time bind) ─────────────────────────────
 // Hoisted to module scope so repeated /stats navigation doesn't leak one
 // listener per visit (five visits = five redraws per theme toggle).

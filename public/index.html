@@ -37,6 +37,7 @@
         <button class="nav-tab" @click="page='dashboard'" :class="{active: page==='dashboard'}">Dashboard</button>
         <button class="nav-tab" @click="page='import'"    :class="{active: page==='import'}">Import</button>
         <button class="nav-tab" @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
+        <button class="nav-tab" @click="page='quiz'"      :class="{active: page==='quiz'}">Quiz</button>
       </div>
       <div class="nav-utility">
         <button class="theme-toggle" @click="toggleTheme()"
@@ -301,6 +302,117 @@
               </div>
             </template>
           </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- QUIZ PAGE -->
+  <div class="page" x-show="page==='quiz'" x-data="quizPage()" x-init="init()">
+    <header class="page-header">
+      <h1 class="page-title">Quiz.</h1>
+      <p class="page-subtitle">Practice questions from the Cert Empire pool</p>
+    </header>
+
+    <!-- View: loading -->
+    <template x-if="view==='loading'">
+      <div class="loading"><span class="spinner"></span> Loading…</div>
+    </template>
+
+    <!-- View: pool picker -->
+    <template x-if="view==='pools'">
+      <div class="quiz-pool-grid">
+        <template x-for="pool in pools" :key="pool.id">
+          <button class="quiz-pool-card"
+                  :disabled="pool.question_count === 0"
+                  @click="startPool(pool.id)">
+            <div class="quiz-pool-name" x-text="pool.name"></div>
+            <div class="quiz-pool-count">
+              <span x-text="pool.question_count"></span>
+              <span class="quiz-pool-count-label">questions</span>
+            </div>
+          </button>
+        </template>
+      </div>
+    </template>
+
+    <!-- View: practice mode -->
+    <template x-if="view==='practice' && currentQ">
+      <div class="quiz-question">
+        <div class="quiz-prompt-en" x-text="currentQ.prompt_en"></div>
+        <div class="quiz-prompt-th" x-show="currentQ.prompt_th" x-text="currentQ.prompt_th"></div>
+
+        <template x-if="currentQ.image_urls && currentQ.image_urls.length">
+          <div class="quiz-images">
+            <template x-for="url in currentQ.image_urls" :key="url">
+              <img class="quiz-image" :src="url" alt="">
+            </template>
+          </div>
+        </template>
+
+        <div class="quiz-choices">
+          <template x-for="choice in currentQ.choices" :key="choice.label">
+            <button class="quiz-choice"
+                    :class="{
+                      'quiz-choice--selected': isSelected(choice.label) && !feedback,
+                      'quiz-choice--correct':  feedback && isCorrectLabel(choice.label),
+                      'quiz-choice--wrong':    feedback && isSelected(choice.label) && !isCorrectLabel(choice.label)
+                    }"
+                    :disabled="feedback !== null"
+                    @click="toggleChoice(choice.label)">
+              <span class="quiz-choice-label" x-text="choice.label"></span>
+              <span class="quiz-choice-text" x-text="choice.text"></span>
+            </button>
+          </template>
+        </div>
+
+        <template x-if="feedback">
+          <div class="quiz-feedback"
+               :class="feedback.is_correct ? 'quiz-feedback--correct' : 'quiz-feedback--wrong'">
+            <div class="quiz-feedback-head">
+              <span x-text="feedback.is_correct ? '✓ Correct' : '× Incorrect'"></span>
+              <span class="quiz-feedback-correct" x-show="!feedback.is_correct">
+                Correct: <span x-text="feedback.correct_labels.join(', ')"></span>
+              </span>
+            </div>
+            <p class="quiz-feedback-explanation" x-show="feedback.explanation"
+               x-text="feedback.explanation"></p>
+          </div>
+        </template>
+
+        <div class="quiz-actions">
+          <button class="btn-primary btn-primary--ghost" @click="finish()">Finish session</button>
+          <button class="btn-primary" x-show="!feedback"
+                  :disabled="selection.length === 0"
+                  @click="submit()">Submit</button>
+          <button class="btn-primary" x-show="feedback" @click="fetchNext()">Next →</button>
+        </div>
+      </div>
+    </template>
+
+    <!-- View: session summary -->
+    <template x-if="view==='summary' && finalSummary">
+      <div class="quiz-summary">
+        <div class="quiz-summary-grid">
+          <div class="stat-card">
+            <div class="stat-num" x-text="finalSummary.total_correct + ' / ' + finalSummary.total_seen"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Score</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="finalSummary.accuracy + '%'"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Accuracy</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="finalSummary.duration_sec + 's'"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Duration</div>
+          </div>
+        </div>
+        <div class="quiz-actions">
+          <button class="btn-primary btn-primary--ghost" @click="backToPools()">Back to pools</button>
+          <button class="btn-primary" @click="restart()">Practice again</button>
         </div>
       </div>
     </template>
