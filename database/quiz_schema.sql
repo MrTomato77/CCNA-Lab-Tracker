@@ -41,3 +41,16 @@ CREATE TABLE IF NOT EXISTS quiz_answers (
 CREATE INDEX IF NOT EXISTS idx_questions_pool         ON questions(pool);
 CREATE INDEX IF NOT EXISTS idx_questions_needs_review ON questions(needs_review);
 CREATE INDEX IF NOT EXISTS idx_answers_session        ON quiz_answers(session_id);
+
+-- v2: per-question mastery state. Separate from `questions` so that a
+-- `POST /api/quiz/reset` is a clean DELETE on this table without touching
+-- source content. A question is mastered when correct_streak >= 2.
+CREATE TABLE IF NOT EXISTS question_progress (
+    question_id     INTEGER PRIMARY KEY,
+    correct_streak  INTEGER NOT NULL DEFAULT 0,
+    last_seen_at    TEXT,
+    last_answer_at  TEXT,
+    FOREIGN KEY (question_id) REFERENCES questions(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_progress_streak ON question_progress(correct_streak);

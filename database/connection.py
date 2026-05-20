@@ -48,6 +48,9 @@ async def _run_schema_migrations(db: aiosqlite.Connection) -> None:
     await _add_column_if_missing(db, "labs", "core_commands",     "TEXT DEFAULT NULL")
     await _add_column_if_missing(db, "labs", "verify_commands",   "TEXT DEFAULT NULL")
     await _add_column_if_missing(db, "labs", "gotchas",           "TEXT DEFAULT NULL")
+    # v2 quiz columns — additive, idempotent.
+    await _add_column_if_missing(db, "quiz_sessions", "batch_size",  "INTEGER")
+    await _add_column_if_missing(db, "quiz_sessions", "best_streak", "INTEGER NOT NULL DEFAULT 0")
 
 
 async def _cleanup_stale_attempts(db: aiosqlite.Connection) -> None:
