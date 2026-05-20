@@ -1,8 +1,12 @@
-"""Business logic for the Quiz/Practice module.
+"""Business logic for the Quiz/Practice module (v2 — unified queue).
 
-Quiz tables (`questions`, `quiz_sessions`, `quiz_answers`) share the SQLite
-file with the lab tracker but no foreign keys cross the boundary — this
-module never imports from `services/lab_service.py` or vice-versa.
+Quiz tables (`questions`, `quiz_sessions`, `quiz_answers`, `question_progress`)
+share the SQLite file with the lab tracker but no foreign keys cross the
+boundary — this module never imports from `services/lab_service.py`.
+
+v2 dropped the pool-picker model. Mastery is per-question and persists
+across sessions: a question is mastered when ``question_progress.correct_streak``
+reaches 2; mastered questions are excluded from ``next_question`` candidates.
 """
 from __future__ import annotations
 
@@ -10,13 +14,21 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from core.exam_pools import POOL_ALL, POOL_LABELS, POOL_VALUES, SESSION_POOL_VALUES
+import aiosqlite
+
 from core.responses import ErrorResponse, api_error
 from database.connection import get_db
 
 ALREADY_ANSWERED = {"already_answered": True}
 """Sentinel returned by ``submit_answer`` when the question was already
 answered in this session — the router maps it to 409."""
+
+VALID_BATCH_SIZES: frozenset[int | str] = frozenset({25, 50, 75, 100, "ENDLESS"})
+
+# Process-wide cache of in-flight session_streak counters. The session_streak
+# is the current correct-streak within the live session — used to bump
+# quiz_sessions.best_streak. Cleared on finish or process restart.
+_session_streak: dict[int, int] = {}
 
 _ISO_FMT = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -26,42 +38,48 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).strftime(_ISO_FMT)
 
 
-async def list_pools() -> list[dict[str, Any]]:
-    """Return per-pool question counts (quizable only) plus an `ALL` row."""
-    db = await get_db()
+# ── Candidate pool helper ───────────────────────────────────────────────
+
+async def _candidate_count(db: aiosqlite.Connection) -> int:
+    """Number of quizable questions whose progress (if any) is below mastery."""
     async with db.execute(
         """
-        SELECT pool, COUNT(*) AS n
-          FROM questions
-         WHERE needs_review = 0
-         GROUP BY pool
+        SELECT COUNT(*) FROM questions q
+         LEFT JOIN question_progress p ON p.question_id = q.id
+         WHERE q.needs_review = 0
+           AND COALESCE(p.correct_streak, 0) < 2
         """
     ) as cur:
-        counts = {row["pool"]: row["n"] for row in await cur.fetchall()}
-
-    out = [
-        {"id": pool, "name": POOL_LABELS[pool], "question_count": counts.get(pool, 0)}
-        for pool in POOL_VALUES
-    ]
-    out.append({
-        "id": POOL_ALL,
-        "name": POOL_LABELS[POOL_ALL],
-        "question_count": sum(counts.values()),
-    })
-    return out
+        return (await cur.fetchone())[0]
 
 
-async def start_session(pool: str) -> int:
-    """Open a session for *pool*; return its id."""
-    if pool not in SESSION_POOL_VALUES:
-        raise ValueError(f"invalid pool {pool!r}")
+# ── Session lifecycle ───────────────────────────────────────────────────
+
+async def start_session(batch_size: int | str) -> tuple[int, int]:
+    """Open a session for *batch_size*; return ``(session_id, picked_n)``.
+
+    ``batch_size`` must be one of {25, 50, 75, 100, "ENDLESS"}.
+    ``picked_n`` is the effective cap given the current candidate count;
+    for ENDLESS it equals all candidates.
+    """
+    if batch_size not in VALID_BATCH_SIZES:
+        raise ValueError(
+            f"batch_size must be one of {sorted(VALID_BATCH_SIZES, key=str)!r}"
+        )
     db = await get_db()
+    candidates = await _candidate_count(db)
+    if batch_size == "ENDLESS":
+        picked_n = candidates
+        stored_batch = None
+    else:
+        picked_n = min(batch_size, candidates)
+        stored_batch = batch_size
     cur = await db.execute(
-        "INSERT INTO quiz_sessions (pool, started_at) VALUES (?, ?)",
-        (pool, _now_iso()),
+        "INSERT INTO quiz_sessions (pool, batch_size, started_at) VALUES ('ALL', ?, ?)",
+        (stored_batch, _now_iso()),
     )
     await db.commit()
-    return cur.lastrowid
+    return cur.lastrowid, picked_n
 
 
 async def _session_row(session_id: int) -> dict[str, Any] | None:
@@ -85,13 +103,19 @@ async def require_session(
     return row, None
 
 
-async def next_question(session_id: int) -> dict[str, Any] | None:
-    """Pick a random unseen quizable question for *session_id*.
+# ── Question delivery ──────────────────────────────────────────────────
 
-    Returns the question payload without leaking the correct answer, or
-    `None` when the session has exhausted its pool. The router must have
-    already verified the session exists via ``require_session`` — this
-    function assumes the session row is valid.
+async def next_question(session_id: int) -> dict[str, Any] | None:
+    """Pick a random un-mastered question for *session_id*.
+
+    Returns one of:
+      * ``None``                       — session row missing (caller bug;
+                                         router should have called require_session)
+      * ``{"exhausted": True}``        — batch cap hit or no candidates
+      * ``{question_id, prompt_en, prompt_th, choices, multi, image_urls,
+         current_streak, position: {seen, total | None}}``
+
+    Never leaks ``correct_labels`` or ``explanation``.
     """
     db = await get_db()
     session = await _session_row(session_id)
@@ -99,45 +123,49 @@ async def next_question(session_id: int) -> dict[str, Any] | None:
         # Router pre-check should make this unreachable; raise loudly so
         # a corrupted session can't be mistaken for an exhausted pool.
         raise LookupError(f"session {session_id} disappeared")
+    cap = session["batch_size"]   # None == ENDLESS
+    seen = session["total_seen"] or 0
+    if cap is not None and seen >= cap:
+        return {"exhausted": True}
 
-    pool = session["pool"]
-    if pool == POOL_ALL:
-        pool_filter = ""
-        params: tuple[Any, ...] = (session_id,)
-    else:
-        pool_filter = "AND q.pool = ?"
-        params = (session_id, pool)
-
-    sql = f"""
+    async with db.execute(
+        """
         SELECT q.id, q.prompt_en, q.prompt_th, q.choices_json,
-               q.correct_labels, q.image_filenames
+               q.correct_labels, q.image_filenames,
+               COALESCE(p.correct_streak, 0) AS current_streak
           FROM questions q
+          LEFT JOIN question_progress p ON p.question_id = q.id
          WHERE q.needs_review = 0
+           AND COALESCE(p.correct_streak, 0) < 2
            AND q.id NOT IN (
                SELECT question_id FROM quiz_answers WHERE session_id = ?
            )
-           {pool_filter}
          ORDER BY RANDOM()
          LIMIT 1
-    """
-    async with db.execute(sql, params) as cur:
+        """,
+        (session_id,),
+    ) as cur:
         picked = await cur.fetchone()
     if picked is None:
-        return None
+        return {"exhausted": True}
 
     correct_count = len(json.loads(picked["correct_labels"]))
     return {
-        "question_id":  picked["id"],
-        "prompt_en":    picked["prompt_en"],
-        "prompt_th":    picked["prompt_th"],
-        "choices":      json.loads(picked["choices_json"]),
-        "multi":        correct_count > 1,
-        "image_urls":   [
+        "question_id":     picked["id"],
+        "prompt_en":       picked["prompt_en"],
+        "prompt_th":       picked["prompt_th"],
+        "choices":         json.loads(picked["choices_json"]),
+        "multi":           correct_count > 1,
+        "image_urls": [
             f"/api/quiz/images/{fname}"
             for fname in json.loads(picked["image_filenames"])
         ],
+        "current_streak":  picked["current_streak"],
+        "position":        {"seen": seen, "total": cap},
     }
 
+
+# ── Answer flow ────────────────────────────────────────────────────────
 
 async def submit_answer(
     session_id: int,
@@ -147,11 +175,12 @@ async def submit_answer(
     """Persist an answer and return correctness + reveal info.
 
     Returns:
-        * ``None`` if the question doesn't exist
-        * ``ALREADY_ANSWERED`` (sentinel dict) if the question has been
-          answered in this session — the second submission is ignored
-          so a repeated POST can't inflate ``total_correct``
-        * ``{is_correct, correct_labels, explanation}`` on success
+      * ``None``              — question doesn't exist
+      * ``ALREADY_ANSWERED``  — repeated submit for this (session, question)
+      * ``{is_correct, correct_labels, explanation}`` on success
+
+    Also updates ``question_progress.correct_streak`` and
+    ``quiz_sessions.best_streak``.
     """
     db = await get_db()
     async with db.execute(
@@ -161,14 +190,12 @@ async def submit_answer(
         row = await cur.fetchone()
     if row is None:
         return None
-
     async with db.execute(
         "SELECT 1 FROM quiz_answers WHERE session_id = ? AND question_id = ?",
         (session_id, question_id),
     ) as cur:
         if await cur.fetchone() is not None:
             return ALREADY_ANSWERED
-
     correct_labels = json.loads(row["correct_labels"])
     if not correct_labels:
         # Defence in depth: a quizable question must have at least one
@@ -178,28 +205,25 @@ async def submit_answer(
     normalized_correct  = sorted(label.upper() for label in correct_labels)
     is_correct = normalized_selected == normalized_correct
 
+    now = _now_iso()
     await db.execute(
-        """
-        INSERT INTO quiz_answers
-            (session_id, question_id, selected_labels, is_correct, answered_at)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (
-            session_id,
-            question_id,
-            json.dumps(selected_labels),
-            int(is_correct),
-            _now_iso(),
-        ),
+        """INSERT INTO quiz_answers
+             (session_id, question_id, selected_labels, is_correct, answered_at)
+           VALUES (?, ?, ?, ?, ?)""",
+        (session_id, question_id, json.dumps(selected_labels), int(is_correct), now),
     )
+    await _bump_question_progress(db, question_id, is_correct, now)
+
+    cur_streak = _session_streak.get(session_id, 0)
+    cur_streak = cur_streak + 1 if is_correct else 0
+    _session_streak[session_id] = cur_streak
     await db.execute(
-        """
-        UPDATE quiz_sessions
-           SET total_seen    = total_seen + 1,
-               total_correct = total_correct + ?
-         WHERE id = ?
-        """,
-        (int(is_correct), session_id),
+        """UPDATE quiz_sessions
+              SET total_seen    = total_seen + 1,
+                  total_correct = total_correct + ?,
+                  best_streak   = MAX(best_streak, ?)
+            WHERE id = ?""",
+        (int(is_correct), cur_streak, session_id),
     )
     await db.commit()
     return {
@@ -209,8 +233,136 @@ async def submit_answer(
     }
 
 
+async def dont_know(session_id: int, question_id: int) -> dict[str, Any] | None:
+    """User opts out of guessing.
+
+    Reveals correct + explanation, resets the per-question streak to 0,
+    and counts the question as seen (not correct).
+    """
+    db = await get_db()
+    async with db.execute(
+        "SELECT correct_labels, explanation FROM questions WHERE id = ?",
+        (question_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    correct_labels = json.loads(row["correct_labels"])
+    now = _now_iso()
+    await db.execute(
+        """INSERT INTO quiz_answers
+             (session_id, question_id, selected_labels, is_correct, answered_at)
+           VALUES (?, ?, '[]', 0, ?)""",
+        (session_id, question_id, now),
+    )
+    await _bump_question_progress(db, question_id, is_correct=False, now=now)
+    _session_streak[session_id] = 0
+    await db.execute(
+        "UPDATE quiz_sessions SET total_seen = total_seen + 1 WHERE id = ?",
+        (session_id,),
+    )
+    await db.commit()
+    return {
+        "is_correct":     False,
+        "correct_labels": correct_labels,
+        "explanation":    row["explanation"],
+    }
+
+
+async def _bump_question_progress(
+    db: aiosqlite.Connection,
+    question_id: int,
+    is_correct: bool,
+    now: str,
+) -> None:
+    """UPSERT question_progress: +1 streak on correct, reset to 0 on wrong."""
+    new_streak_sql = "correct_streak + 1" if is_correct else "0"
+    await db.execute(
+        f"""
+        INSERT INTO question_progress
+            (question_id, correct_streak, last_seen_at, last_answer_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(question_id) DO UPDATE SET
+            correct_streak = {new_streak_sql},
+            last_seen_at   = excluded.last_seen_at,
+            last_answer_at = excluded.last_answer_at
+        """,
+        (question_id, 1 if is_correct else 0, now, now),
+    )
+
+
+# ── Reset ──────────────────────────────────────────────────────────────
+
+async def reset_progress() -> int:
+    """Truncate question_progress. Returns the row count cleared."""
+    db = await get_db()
+    async with db.execute("SELECT COUNT(*) FROM question_progress") as cur:
+        count = (await cur.fetchone())[0]
+    await db.execute("DELETE FROM question_progress")
+    await db.commit()
+    return count
+
+
+# ── Dashboard ──────────────────────────────────────────────────────────
+
+async def get_dashboard() -> dict[str, Any]:
+    """Aggregate counts + recent sessions for the Quiz landing page."""
+    db = await get_db()
+    async with db.execute("SELECT COUNT(*) FROM questions") as cur:
+        parsed_total = (await cur.fetchone())[0]
+    async with db.execute(
+        "SELECT COUNT(*) FROM questions WHERE needs_review = 0"
+    ) as cur:
+        quizable_total = (await cur.fetchone())[0]
+    async with db.execute(
+        "SELECT COUNT(*) FROM questions WHERE needs_review = 1"
+    ) as cur:
+        flagged_count = (await cur.fetchone())[0]
+    async with db.execute(
+        "SELECT COUNT(*) FROM question_progress WHERE correct_streak >= 2"
+    ) as cur:
+        mastered_count = (await cur.fetchone())[0]
+    async with db.execute(
+        """SELECT COUNT(*) FROM question_progress
+             WHERE correct_streak < 2 AND last_seen_at IS NOT NULL"""
+    ) as cur:
+        wrong_queue_count = (await cur.fetchone())[0]
+
+    async with db.execute(
+        """SELECT id, started_at, ended_at, total_seen, total_correct,
+                  best_streak, batch_size
+             FROM quiz_sessions
+            WHERE batch_size IS NOT NULL
+            ORDER BY id DESC
+            LIMIT 5"""
+    ) as cur:
+        rows = [dict(r) for r in await cur.fetchall()]
+    recent_sessions = [_decorate_session_row(r) for r in rows]
+    latest_session = recent_sessions[0] if recent_sessions else None
+
+    return {
+        "mastered_count":    mastered_count,
+        "quizable_total":    quizable_total,
+        "parsed_total":      parsed_total,
+        "flagged_count":     flagged_count,
+        "wrong_queue_count": wrong_queue_count,
+        "recent_sessions":   recent_sessions,
+        "latest_session":    latest_session,
+    }
+
+
+def _decorate_session_row(row: dict[str, Any]) -> dict[str, Any]:
+    total = row["total_seen"] or 0
+    correct = row["total_correct"] or 0
+    accuracy = round((correct / total) * 100, 1) if total else 0.0
+    duration = _duration_seconds(row["started_at"], row["ended_at"])
+    return {**row, "accuracy": accuracy, "duration_sec": duration}
+
+
+# ── Finish + summary ───────────────────────────────────────────────────
+
 async def finish_session(session_id: int) -> dict[str, Any] | None:
-    """Mark *session_id* ended (if not already) and return a summary."""
+    """Mark *session_id* ended (if not already) and return its summary."""
     db = await get_db()
     session = await _session_row(session_id)
     if session is None:
@@ -221,11 +373,12 @@ async def finish_session(session_id: int) -> dict[str, Any] | None:
             (_now_iso(), session_id),
         )
         await db.commit()
+    _session_streak.pop(session_id, None)
     return await get_summary(session_id)
 
 
 async def get_summary(session_id: int) -> dict[str, Any] | None:
-    """Read a session's final or in-progress totals."""
+    """Read a session's final-or-in-progress totals + wrong-answer detail."""
     session = await _session_row(session_id)
     if session is None:
         return None
@@ -233,17 +386,46 @@ async def get_summary(session_id: int) -> dict[str, Any] | None:
     correct = session["total_correct"] or 0
     accuracy = round((correct / total) * 100, 1) if total else 0.0
     duration = _duration_seconds(session["started_at"], session["ended_at"])
+
+    db = await get_db()
+    async with db.execute(
+        """SELECT q.id AS question_id, q.prompt_en, q.prompt_th, q.choices_json,
+                  q.correct_labels, q.explanation, a.selected_labels
+             FROM quiz_answers a
+             JOIN questions q ON q.id = a.question_id
+            WHERE a.session_id = ? AND a.is_correct = 0
+            ORDER BY a.id ASC""",
+        (session_id,),
+    ) as cur:
+        wrong_rows = await cur.fetchall()
+    wrong_answers = [
+        {
+            "question_id":     r["question_id"],
+            "prompt_en":       r["prompt_en"],
+            "prompt_th":       r["prompt_th"],
+            "choices":         json.loads(r["choices_json"]),
+            "correct_labels":  json.loads(r["correct_labels"]),
+            "selected_labels": json.loads(r["selected_labels"]),
+            "explanation":     r["explanation"],
+        }
+        for r in wrong_rows
+    ]
+
     return {
         "session_id":    session_id,
-        "pool":          session["pool"],
+        "batch_size":    session["batch_size"],
         "started_at":    session["started_at"],
         "ended_at":      session["ended_at"],
         "total_seen":    total,
         "total_correct": correct,
         "accuracy":      accuracy,
         "duration_sec":  duration,
+        "best_streak":   session["best_streak"] or 0,
+        "wrong_answers": wrong_answers,
     }
 
+
+# ── Time helpers ───────────────────────────────────────────────────────
 
 def _duration_seconds(started_at: str | None, ended_at: str | None) -> int | None:
     """Seconds between two ISO-8601 UTC timestamps stored as text."""

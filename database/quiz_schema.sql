@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS quiz_sessions (
     ended_at        TEXT,
     total_seen      INTEGER NOT NULL DEFAULT 0,
     total_correct   INTEGER NOT NULL DEFAULT 0,
+    batch_size      INTEGER,                              -- v2: NULL = ENDLESS
+    best_streak     INTEGER NOT NULL DEFAULT 0,           -- v2: max in-session streak
     CHECK (pool IN ('A','B','C','D','ALL'))
 );
 
