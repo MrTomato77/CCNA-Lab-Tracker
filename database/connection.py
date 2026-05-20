@@ -10,7 +10,7 @@ QUIZ_SCHEMA_PATH = Path(__file__).parent / "quiz_schema.sql"
 
 _db: aiosqlite.Connection | None = None
 _db_lock = asyncio.Lock()
-_ALLOWED_MIGRATION_TABLES = frozenset({"labs", "progress", "attempts"})
+_ALLOWED_MIGRATION_TABLES = frozenset({"labs", "progress", "attempts", "quiz_sessions"})
 
 
 async def _add_column_if_missing(

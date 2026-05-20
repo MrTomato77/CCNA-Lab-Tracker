@@ -1,18 +1,23 @@
-"""Pydantic schemas for the quiz API.
-
-Mirrors the boundary-validation style of ``models/schemas.py``. Only the
-inbound request payloads are typed here — outbound shapes are plain dicts
-built by the service layer.
-"""
-from __future__ import annotations
+"""Pydantic schemas for the quiz API."""
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
-from core.exam_pools import SessionPool
+
+_BATCH_INTS = {25, 50, 75, 100}
 
 
 class SessionStart(BaseModel):
-    pool: SessionPool
+    batch_size: int | Literal["ENDLESS"]
+
+    @field_validator("batch_size")
+    @classmethod
+    def valid_batch(cls, v):
+        if v == "ENDLESS":
+            return v
+        if not isinstance(v, int) or v not in _BATCH_INTS:
+            raise ValueError("batch_size must be 25, 50, 75, 100, or 'ENDLESS'")
+        return v
 
 
 class AnswerSubmit(BaseModel):
@@ -45,3 +50,14 @@ class AnswerSubmit(BaseModel):
         if len(set(normalized)) != len(normalized):
             raise ValueError("duplicate labels not allowed")
         return normalized
+
+
+class DontKnowSubmit(BaseModel):
+    question_id: int
+
+    @field_validator("question_id")
+    @classmethod
+    def positive_id(cls, v: int) -> int:
+        if v <= 0:
+            raise ValueError("question_id must be positive")
+        return v
