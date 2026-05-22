@@ -214,6 +214,13 @@ document.addEventListener("alpine:init", () => {
     },
     close() { this.open = false; this.data = null; this.error = null; }
   });
+
+  Alpine.store("imageModal", {
+    open: false,
+    url: null,
+    show(url) { this.url = url; this.open = true; },
+    close()   { this.open = false; this.url = null; },
+  });
 });
 
 // ── App Shell ─────────────────────────────────────────────────────────────
@@ -627,61 +634,147 @@ window.statsPage = function() {
   }
 }
 
-// ── Quiz Page ──────────────────────────────────────────────────────────────
+// ── Quiz Page (v2) ─────────────────────────────────────────────────────────
 window.quizPage = function() {
+  const BATCH_SIZES = [
+    { value: 25,        label: "25"  },
+    { value: 50,        label: "50"  },
+    { value: 75,        label: "75"  },
+    { value: 100,       label: "100" },
+    { value: "ENDLESS", label: "∞"   },
+  ];
+
   return {
-    view: "pools",          // "pools" | "loading" | "practice" | "summary"
-    pools: [],              // [{id, name, question_count}]
+    BATCH_SIZES,
+    view: "loading",          // "loading" | "landing" | "practice" | "summary"
+    dashboard: null,
     sessionId: null,
-    selectedPool: null,
-    currentQ: null,         // {question_id, prompt_en, prompt_th, choices, multi, image_urls}
-    selection: [],          // user's current label selection
-    feedback: null,         // {is_correct, correct_labels, explanation} after submit
-    submitting: false,      // in-flight guard against double-click on Submit
+    pickedN: null,
+    currentQ: null,
+    selection: [],
+    feedback: null,
+    submitting: false,
     finalSummary: null,
+    startedAt: 0,             // ms — session timer
+    elapsed: 0,               // ms — re-rendered every second
+    elapsedFormatted: "00:00",
+    _timerId: null,
+    _qStartedAt: 0,
+    lastQSec: 0,
 
     async init() {
-      await this.loadPools();
+      await this.loadDashboard();
     },
 
-    async loadPools() {
+    async loadDashboard() {
       this.view = "loading";
       try {
-        const json = await api("/api/quiz/pools");
+        const json = await api("/api/quiz/dashboard");
         if (json.success) {
-          this.pools = json.data;
+          this.dashboard = json.data;
         } else {
-          window.showToast("× " + (json.error || "Failed to load pools"), "error");
-          this.pools = [];
+          window.showToast("× " + (json.error || "Failed to load"), "error");
+          this.dashboard = null;
         }
       } catch (e) {
         window.showToast("× Network error", "error");
-        this.pools = [];
+        this.dashboard = null;
       } finally {
-        this.view = "pools";
+        this.view = "landing";
       }
     },
 
-    async startPool(poolId) {
-      if (!poolId) return;
+    masteryPct() {
+      const d = this.dashboard;
+      if (!d || !d.quizable_total) return 0;
+      return Math.round((d.mastered_count / d.quizable_total) * 100);
+    },
+    candidateCount() {
+      const d = this.dashboard;
+      if (!d) return 0;
+      return d.quizable_total - d.mastered_count;
+    },
+    canStart(value) {
+      if (value === "ENDLESS") return this.candidateCount() > 0;
+      return value <= this.candidateCount();
+    },
+    latestAccuracy() {
+      const s = this.dashboard?.latest_session;
+      return s ? `${s.accuracy}%` : "—";
+    },
+    latestBestStreak() {
+      const s = this.dashboard?.latest_session;
+      return s ? String(s.best_streak) : "—";
+    },
+    latestDuration() {
+      const s = this.dashboard?.latest_session;
+      return s ? this.formatDur(s.duration_sec) : "—";
+    },
+    positionText() {
+      if (!this.currentQ) return "";
+      const p = this.currentQ.position;
+      const total = p.total !== null ? p.total : "∞";
+      return `Question ${p.seen + 1} / ${total}`;
+    },
+    progressPct() {
+      if (!this.currentQ) return 0;
+      const p = this.currentQ.position;
+      if (p.total === null) return 0; // ∞ — no progress bar fill
+      return Math.round(((p.seen + 1) / p.total) * 100);
+    },
+    formatDur(sec) {
+      if (sec == null) return "—";
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+    },
+    ago(iso) {
+      if (!iso) return "—";
+      const diff = (Date.now() - Date.parse(iso)) / 1000;
+      if (diff < 60)   return `${Math.floor(diff)}s ago`;
+      if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+      if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+      return `${Math.floor(diff/86400)}d ago`;
+    },
+
+    async startSession(batchSize) {
       this.view = "loading";
-      this.selectedPool = poolId;
       this.feedback = null;
       this.selection = [];
       try {
         const json = await api("/api/quiz/sessions",
-          { method: "POST", body: { pool: poolId } });
+          { method: "POST", body: { batch_size: batchSize } });
         if (!json.success) {
-          window.showToast("× " + (json.error || "Failed to start"), "error");
-          this.view = "pools";
+          window.showToast("× " + json.error, "error");
+          this.view = "landing";
           return;
         }
         this.sessionId = json.data.session_id;
+        this.pickedN   = json.data.picked_n;
+        this.startedAt = Date.now();
+        this._startTimer();
         await this.fetchNext();
       } catch (e) {
         window.showToast("× Network error", "error");
-        this.view = "pools";
+        this.view = "landing";
       }
+    },
+
+    _startTimer() {
+      this._stopTimer();
+      this._tick();
+      this._timerId = setInterval(() => this._tick(), 1000);
+    },
+    _stopTimer() {
+      if (this._timerId) {
+        clearInterval(this._timerId);
+        this._timerId = null;
+      }
+    },
+    _tick() {
+      this.elapsed = Date.now() - this.startedAt;
+      const sec = Math.floor(this.elapsed / 1000);
+      this.elapsedFormatted = this.formatDur(sec);
     },
 
     async fetchNext() {
@@ -692,22 +785,24 @@ window.quizPage = function() {
         const json = await api(`/api/quiz/sessions/${this.sessionId}/next`);
         if (!json.success) {
           window.showToast("× " + json.error, "error");
+          this.view = "landing";
           return;
         }
-        if (!json.data) {           // pool exhausted
-          await this.finish();
+        if (json.data && json.data.exhausted) {
+          await this.finishSession();
           return;
         }
         this.currentQ = json.data;
+        this._qStartedAt = Date.now();
         this.view = "practice";
       } catch (e) {
         window.showToast("× Network error", "error");
-        this.view = "pools";
+        this.view = "landing";
       }
     },
 
     toggleChoice(label) {
-      if (this.feedback) return;    // freeze after submit
+      if (this.feedback) return;
       if (!this.currentQ.multi) {
         this.selection = [label];
         return;
@@ -716,7 +811,6 @@ window.quizPage = function() {
       if (i >= 0) this.selection.splice(i, 1);
       else this.selection.push(label);
     },
-
     isSelected(label)     { return this.selection.includes(label); },
     isCorrectLabel(label) {
       return !!this.feedback && this.feedback.correct_labels.includes(label);
@@ -725,13 +819,12 @@ window.quizPage = function() {
     async submit() {
       if (!this.selection.length || this.feedback || this.submitting) return;
       this.submitting = true;
+      this.lastQSec = Math.round((Date.now() - this._qStartedAt) / 1000);
       try {
         const json = await api(`/api/quiz/sessions/${this.sessionId}/answers`, {
           method: "POST",
-          body: {
-            question_id:     this.currentQ.question_id,
-            selected_labels: this.selection,
-          },
+          body: { question_id: this.currentQ.question_id,
+                  selected_labels: this.selection },
         });
         if (!json.success) {
           window.showToast("× " + json.error, "error");
@@ -745,11 +838,31 @@ window.quizPage = function() {
       }
     },
 
-    async finish() {
+    async iDontKnow() {
+      if (this.feedback || this.submitting) return;
+      this.submitting = true;
+      this.lastQSec = Math.round((Date.now() - this._qStartedAt) / 1000);
+      try {
+        const json = await api(`/api/quiz/sessions/${this.sessionId}/dont-know`,
+          { method: "POST", body: { question_id: this.currentQ.question_id } });
+        if (!json.success) {
+          window.showToast("× " + json.error, "error");
+          return;
+        }
+        this.feedback = json.data;
+      } catch (e) {
+        window.showToast("× Network error", "error");
+      } finally {
+        this.submitting = false;
+      }
+    },
+
+    async finishSession() {
       if (!this.sessionId) {
-        this.view = "pools";
+        this.view = "landing";
         return;
       }
+      this._stopTimer();
       this.view = "loading";
       try {
         const json = await api(
@@ -767,20 +880,40 @@ window.quizPage = function() {
       }
     },
 
-    async restart() {
-      const pool = this.selectedPool;
-      this.sessionId = null;
+    async practiceAgain() {
+      const last = this.dashboard?.latest_session?.batch_size ?? 25;
+      this.sessionId    = null;
       this.finalSummary = null;
-      await this.startPool(pool);
+      await this.loadDashboard();   // refresh counts before relaunching
+      await this.startSession(last);
     },
 
-    backToPools() {
-      this.sessionId   = null;
-      this.currentQ    = null;
+    async backToLanding() {
+      this.sessionId    = null;
+      this.currentQ     = null;
       this.finalSummary = null;
-      this.selection   = [];
-      this.feedback    = null;
-      this.loadPools();
+      this.selection    = [];
+      this.feedback     = null;
+      await this.loadDashboard();
+    },
+
+    async resetProgress() {
+      const ok = await Alpine.store("modal").show(
+        "This will reset all quiz mastery progress. Session history is kept.",
+        "Reset quiz progress", true,
+      );
+      if (!ok) return;
+      try {
+        const json = await api("/api/quiz/reset", { method: "POST" });
+        if (json.success) {
+          window.showToast(`+ Reset ${json.data.cleared_progress} rows`, "success");
+          await this.loadDashboard();
+        } else {
+          window.showToast("× " + json.error, "error");
+        }
+      } catch (e) {
+        window.showToast("× Network error", "error");
+      }
     },
   };
 };
