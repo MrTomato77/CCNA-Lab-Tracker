@@ -316,24 +316,74 @@ async def test_dont_know_returns_none_for_missing_question(tmp_db):
     assert await svc.dont_know(sid, 9999) is None
 
 
+@pytest.mark.asyncio
+async def test_dont_know_rejects_double_submit_in_same_session(tmp_db):
+    # Mirror of test_submit_answer_rejects_double_submit_in_same_session —
+    # the dont_know path must guard against the same race (rapid clicks,
+    # network retries) or it would double-count total_seen.
+    await _seed(tmp_db, id=1, correct=["B"], explanation="why")
+    sid, _ = await svc.start_session("ENDLESS")
+    first = await svc.dont_know(sid, 1)
+    assert first is not None and first["correct_labels"] == ["B"]
+    second = await svc.dont_know(sid, 1)
+    assert second is svc.ALREADY_ANSWERED
+    async with tmp_db.execute(
+        "SELECT total_seen FROM quiz_sessions WHERE id=?", (sid,)
+    ) as cur:
+        assert (await cur.fetchone())["total_seen"] == 1
+
+
 # ───────────────────────── reset_progress ─────────────────────────
 
 @pytest.mark.asyncio
 async def test_reset_progress_clears_question_progress_rows(tmp_db):
     await _seed(tmp_db, id=1, streak=2)
     await _seed(tmp_db, id=2, streak=1)
-    cleared = await svc.reset_progress()
-    assert cleared == 2
+    result = await svc.reset_progress()
+    assert result["cleared_progress"] == 2
+    assert result["cleared_sessions"] == 0
+    assert result["cleared_answers"] == 0
     async with tmp_db.execute("SELECT COUNT(*) FROM question_progress") as cur:
         assert (await cur.fetchone())[0] == 0
 
 
 @pytest.mark.asyncio
-async def test_reset_progress_does_not_touch_quiz_sessions(tmp_db):
-    sid, _ = await svc.start_session("ENDLESS")
-    await svc.reset_progress()
+async def test_reset_progress_clears_quiz_sessions_too(tmp_db):
+    # v2 reset is a full quiz-state wipe — sessions go too, not just
+    # question_progress like the v1 behavior.
+    await svc.start_session("ENDLESS")
+    result = await svc.reset_progress()
+    assert result["cleared_sessions"] == 1
     async with tmp_db.execute("SELECT COUNT(*) FROM quiz_sessions") as cur:
-        assert (await cur.fetchone())[0] == 1
+        assert (await cur.fetchone())[0] == 0
+
+
+@pytest.mark.asyncio
+async def test_reset_progress_clears_session_streak_cache(tmp_db):
+    # Seed all three quiz tables so we can verify a single reset call
+    # wipes the lot: question_progress, quiz_sessions, quiz_answers, plus
+    # the in-process _session_streak cache (which would otherwise survive
+    # a global reset and inflate the next session's best_streak MAX()).
+    await _seed(tmp_db, id=1, correct=["B"])
+    await _seed(tmp_db, id=2, correct=["B"], streak=1)  # extra progress row
+    sid, _ = await svc.start_session("ENDLESS")
+    await svc.submit_answer(sid, 1, ["B"])  # writes quiz_answers + progress
+    assert svc._session_streak.get(sid) == 1
+
+    result = await svc.reset_progress()
+
+    # Returned dict: counts per table reflect pre-reset state.
+    assert result == {
+        "cleared_progress": 2,   # id=2 seeded streak + id=1 from submit_answer
+        "cleared_sessions": 1,
+        "cleared_answers":  1,
+    }
+    # All three tables truly empty.
+    for tbl in ("question_progress", "quiz_sessions", "quiz_answers"):
+        async with tmp_db.execute(f"SELECT COUNT(*) FROM {tbl}") as cur:
+            assert (await cur.fetchone())[0] == 0, f"{tbl} not empty"
+    # In-process streak cache wiped.
+    assert sid not in svc._session_streak
 
 
 # ───────────────────────── get_dashboard ─────────────────────────

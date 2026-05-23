@@ -238,6 +238,11 @@ async def dont_know(session_id: int, question_id: int) -> dict[str, Any] | None:
 
     Reveals correct + explanation, resets the per-question streak to 0,
     and counts the question as seen (not correct).
+
+    Returns:
+      * ``None``              — question doesn't exist
+      * ``ALREADY_ANSWERED``  — repeated submit for this (session, question)
+      * ``{is_correct, correct_labels, explanation}`` on success
     """
     db = await get_db()
     async with db.execute(
@@ -247,6 +252,12 @@ async def dont_know(session_id: int, question_id: int) -> dict[str, Any] | None:
         row = await cur.fetchone()
     if row is None:
         return None
+    async with db.execute(
+        "SELECT 1 FROM quiz_answers WHERE session_id = ? AND question_id = ?",
+        (session_id, question_id),
+    ) as cur:
+        if await cur.fetchone() is not None:
+            return ALREADY_ANSWERED
     correct_labels = json.loads(row["correct_labels"])
     now = _now_iso()
     await db.execute(
@@ -276,31 +287,52 @@ async def _bump_question_progress(
     now: str,
 ) -> None:
     """UPSERT question_progress: +1 streak on correct, reset to 0 on wrong."""
-    new_streak_sql = "correct_streak + 1" if is_correct else "0"
+    # Parameterized CASE WHEN keeps the SQL fully literal — the bool flag
+    # is never interpolated into the statement text.
+    flag = 1 if is_correct else 0
     await db.execute(
-        f"""
+        """
         INSERT INTO question_progress
             (question_id, correct_streak, last_seen_at, last_answer_at)
         VALUES (?, ?, ?, ?)
         ON CONFLICT(question_id) DO UPDATE SET
-            correct_streak = {new_streak_sql},
+            correct_streak = CASE WHEN ? = 1 THEN correct_streak + 1 ELSE 0 END,
             last_seen_at   = excluded.last_seen_at,
             last_answer_at = excluded.last_answer_at
         """,
-        (question_id, 1 if is_correct else 0, now, now),
+        (question_id, flag, now, now, flag),
     )
 
 
 # ── Reset ──────────────────────────────────────────────────────────────
 
-async def reset_progress() -> int:
-    """Truncate question_progress. Returns the row count cleared."""
+async def reset_progress() -> dict[str, int]:
+    """Truncate all quiz tables. Returns row counts per table.
+
+    Clears ``question_progress``, ``quiz_answers``, ``quiz_sessions``, AND
+    the in-memory ``_session_streak`` cache. Question content (the
+    ``questions`` table) is preserved — it's source-of-truth data from the
+    parser.
+
+    Delete order: ``quiz_answers`` first, then ``quiz_sessions``, then
+    ``question_progress`` — keeps things safe if anyone re-adds FK
+    constraints later.
+    """
     db = await get_db()
-    async with db.execute("SELECT COUNT(*) FROM question_progress") as cur:
-        count = (await cur.fetchone())[0]
-    await db.execute("DELETE FROM question_progress")
+    counts: dict[str, int] = {}
+    # Hard-coded literal tuple — these are not user input, so the f-string
+    # below carries no SQL-injection risk.
+    for tbl in ("quiz_answers", "quiz_sessions", "question_progress"):
+        async with db.execute(f"SELECT COUNT(*) FROM {tbl}") as cur:
+            counts[tbl] = (await cur.fetchone())[0]
+        await db.execute(f"DELETE FROM {tbl}")
     await db.commit()
-    return count
+    _session_streak.clear()
+    return {
+        "cleared_progress": counts["question_progress"],
+        "cleared_sessions": counts["quiz_sessions"],
+        "cleared_answers":  counts["quiz_answers"],
+    }
 
 
 # ── Dashboard ──────────────────────────────────────────────────────────

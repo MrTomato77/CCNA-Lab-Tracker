@@ -12,15 +12,21 @@ router = SubRouter(__name__, prefix="/api/quiz")
 _MAX_ANSWER_BODY = 512
 
 
-def _parse_session_id(request: Request) -> tuple[int | None, ErrorResponse | None]:
+def _parse_session_id(request: Request) -> int | ErrorResponse:
+    """Return the parsed positive int session id, or an ErrorResponse to bail with.
+
+    Single-return-type pattern lets ``isinstance(sid, int)`` narrow cleanly —
+    no more ``(int | None, ErrorResponse | None)`` tuple unpack that mypy
+    can't reason about post-guard.
+    """
     raw = request.path_params.get("id", "")
     try:
         sid = int(raw)
     except (TypeError, ValueError):
-        return None, api_error("Invalid session id.", "INVALID_SESSION_ID", 400)
+        return api_error("Invalid session id.", "INVALID_SESSION_ID", 400)
     if sid <= 0:
-        return None, api_error("Invalid session id.", "INVALID_SESSION_ID", 400)
-    return sid, None
+        return api_error("Invalid session id.", "INVALID_SESSION_ID", 400)
+    return sid
 
 
 # ───────────────────────── Dashboard ─────────────────────────
@@ -49,9 +55,9 @@ async def start_session(request: Request) -> dict | ErrorResponse:
 
 @router.get("/sessions/:id/next")
 async def next_question(request: Request) -> dict | ErrorResponse:
-    sid, err = _parse_session_id(request)
-    if err:
-        return err
+    sid = _parse_session_id(request)
+    if not isinstance(sid, int):
+        return sid
     _, err = await quiz_service.require_session(sid)
     if err:
         return err
@@ -60,9 +66,9 @@ async def next_question(request: Request) -> dict | ErrorResponse:
 
 @router.post("/sessions/:id/answers")
 async def submit_answer(request: Request) -> dict | ErrorResponse:
-    sid, err = _parse_session_id(request)
-    if err:
-        return err
+    sid = _parse_session_id(request)
+    if not isinstance(sid, int):
+        return sid
     _, err = await quiz_service.require_session(sid)
     if err:
         return err
@@ -85,9 +91,9 @@ async def submit_answer(request: Request) -> dict | ErrorResponse:
 
 @router.post("/sessions/:id/dont-know")
 async def dont_know(request: Request) -> dict | ErrorResponse:
-    sid, err = _parse_session_id(request)
-    if err:
-        return err
+    sid = _parse_session_id(request)
+    if not isinstance(sid, int):
+        return sid
     _, err = await quiz_service.require_session(sid)
     if err:
         return err
@@ -98,14 +104,19 @@ async def dont_know(request: Request) -> dict | ErrorResponse:
     result = await quiz_service.dont_know(sid, data.question_id)
     if result is None:
         return api_error("Question not found.", "QUESTION_NOT_FOUND", 404)
+    if result is quiz_service.ALREADY_ANSWERED:
+        return api_error(
+            "Question already answered in this session.",
+            "ALREADY_ANSWERED", 409,
+        )
     return ok(result)
 
 
 @router.post("/sessions/:id/finish")
 async def finish_session(request: Request) -> dict | ErrorResponse:
-    sid, err = _parse_session_id(request)
-    if err:
-        return err
+    sid = _parse_session_id(request)
+    if not isinstance(sid, int):
+        return sid
     _, err = await quiz_service.require_session(sid)
     if err:
         return err
@@ -114,9 +125,9 @@ async def finish_session(request: Request) -> dict | ErrorResponse:
 
 @router.get("/sessions/:id/summary")
 async def get_summary(request: Request) -> dict | ErrorResponse:
-    sid, err = _parse_session_id(request)
-    if err:
-        return err
+    sid = _parse_session_id(request)
+    if not isinstance(sid, int):
+        return sid
     _, err = await quiz_service.require_session(sid)
     if err:
         return err
@@ -127,8 +138,7 @@ async def get_summary(request: Request) -> dict | ErrorResponse:
 
 @router.post("/reset")
 async def reset_progress(request: Request) -> dict:
-    cleared = await quiz_service.reset_progress()
-    return ok({"cleared_progress": cleared, "cleared_sessions": False})
+    return ok(await quiz_service.reset_progress())
 
 
 # ───────────────────────── Images ─────────────────────────
@@ -139,7 +149,10 @@ async def get_image(request: Request) -> Response:
     try:
         result = await image_service.read_image(filename)
     except Exception:
-        logger.bind(name="api").exception("read_image failed for %s", filename)
+        # Loguru's f-string-bound exception doesn't auto-redact, but the
+        # filename is also `bind`-ed so structured-log consumers can index
+        # it without parsing the message string.
+        logger.bind(name="api", filename=filename).exception("read_image failed")
         return Response(
             status_code=500,
             headers={"Content-Type": "text/plain"},
