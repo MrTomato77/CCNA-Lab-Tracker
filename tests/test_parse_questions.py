@@ -6,8 +6,13 @@ Cert Empire docx are skipped if the (gitignored) source file is absent.
 from __future__ import annotations
 
 import pytest
+from docx import Document
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
+from docx.table import Table, _Cell
 
 from scripts.parse_questions import (
+    GREEN_FILL,
     SOURCE_DOCX,
     classify_table,
     extract_table_images,
@@ -105,3 +110,199 @@ def test_extract_table_images_writes_files(document, tmp_path):
         path = tmp_path / fname
         assert path.exists() and path.stat().st_size > 0
         assert fname.startswith("Q-0002-")
+
+
+# ---------- merged-cell choice reclamation tests (synthetic docx) ----------
+
+def _set_cell_text(cell: _Cell, text: str, *, green: bool = False) -> None:
+    """Replace *cell*'s text with a single paragraph + run, optionally green.
+
+    Mirrors the shading shape the parser detects: ``<w:rPr><w:shd w:fill='e6f0e6'/></w:rPr>``.
+    """
+    # Clear existing paragraphs.
+    for p in list(cell.paragraphs):
+        p._element.getparent().remove(p._element)
+    p = cell.add_paragraph()
+    run = p.add_run(text)
+    if green:
+        rpr = run._r.get_or_add_rPr()
+        shd = OxmlElement("w:shd")
+        shd.set(qn("w:fill"), GREEN_FILL)
+        rpr.append(shd)
+
+
+def _merge_row(table: Table, ri: int) -> None:
+    """Collapse *table*'s row *ri* into a single ``<w:tc>`` with ``gridSpan=2``.
+
+    This mirrors the production-DOCX shape exactly: one underlying ``<w:tc>``
+    spanning both columns, which python-docx then surfaces as ``row.cells``
+    of length 2 — both entries returning identical text. Calling
+    ``Cell.merge`` would concatenate the two cells' text instead, so we
+    manipulate the XML directly.
+    """
+    row = table.rows[ri]
+    tr = row._tr
+    tcs = tr.findall(qn("w:tc"))
+    if len(tcs) < 2:
+        return
+    tc0 = tcs[0]
+    # Drop sibling tc's, keep only tc0.
+    for tc in tcs[1:]:
+        tr.remove(tc)
+    # Mark tc0 as spanning both grid columns.
+    tcpr = tc0.find(qn("w:tcPr"))
+    if tcpr is None:
+        tcpr = OxmlElement("w:tcPr")
+        tc0.insert(0, tcpr)
+    # Remove any pre-existing gridSpan, then add gridSpan=2.
+    for existing in tcpr.findall(qn("w:gridSpan")):
+        tcpr.remove(existing)
+    grid_span = OxmlElement("w:gridSpan")
+    grid_span.set(qn("w:val"), "2")
+    tcpr.append(grid_span)
+
+
+def _make_question_table_with_merged_e(
+    *,
+    qid: int = 999,
+    topic: int = 1,
+    pool: str = "A",
+    prompt_en: str = "Synthetic prompt — pick the best answer.",
+    choice_texts: tuple[str, str, str, str, str] = (
+        "alpha", "bravo", "charlie", "delta", "echo",
+    ),
+    green_labels: tuple[str, ...] = ("E",),
+    explanation: str | None = None,
+) -> Table:
+    """Build a 2-column question table whose 5th choice is a merged-cell row.
+
+    Layout:
+      row 0: header
+      row 1: EN prompt (merged)
+      row 2: choices A | B
+      row 3: choices C | D
+      row 4: choice E (merged single cell)
+      row 5: optional explanation (merged)
+    """
+    doc = Document()
+    n_rows = 5 + (1 if explanation else 0)
+    table = doc.add_table(rows=n_rows, cols=2)
+
+    # Row 0 — header.
+    _set_cell_text(table.cell(0, 0), f"Question #{qid}")
+    _set_cell_text(table.cell(0, 1), f"Topic {topic} - Exam Pool {pool}")
+
+    # Row 1 — EN prompt, both cells identical so classifier sees a dup row.
+    _set_cell_text(table.cell(1, 0), prompt_en)
+    _set_cell_text(table.cell(1, 1), prompt_en)
+
+    # Rows 2-3 — first four choices in 2-col layout.
+    green_set = {f"A": choice_texts[0], "B": choice_texts[1],
+                 "C": choice_texts[2], "D": choice_texts[3]}
+    _set_cell_text(table.cell(2, 0), choice_texts[0], green="A" in green_labels)
+    _set_cell_text(table.cell(2, 1), choice_texts[1], green="B" in green_labels)
+    _set_cell_text(table.cell(3, 0), choice_texts[2], green="C" in green_labels)
+    _set_cell_text(table.cell(3, 1), choice_texts[3], green="D" in green_labels)
+    del green_set
+
+    # Row 4 — choice E. Write the same text to both cells, then merge.
+    _set_cell_text(table.cell(4, 0), choice_texts[4], green="E" in green_labels)
+    _set_cell_text(table.cell(4, 1), choice_texts[4], green="E" in green_labels)
+    _merge_row(table, 4)
+
+    if explanation:
+        _set_cell_text(table.cell(5, 0), explanation)
+        _set_cell_text(table.cell(5, 1), explanation)
+
+    return table
+
+
+def test_extract_5_choices_when_5th_is_merged_row():
+    """A 5-choice question whose 5th choice is a merged cell — choice E green.
+
+    Reclamation rule: ``ri == last_choice_ri + 1`` AND green → reclaim as
+    single-cell choice. Choice E must surface with the correct label.
+    """
+    table = _make_question_table_with_merged_e(
+        qid=901,
+        choice_texts=("alpha", "bravo", "charlie", "delta", "echo"),
+        green_labels=("E",),
+    )
+    q = classify_table(table, source_index=0)
+
+    assert q is not None
+    assert q.id == 901
+    assert [c["label"] for c in q.choices] == ["A", "B", "C", "D", "E"]
+    assert [c["text"]  for c in q.choices] == [
+        "alpha", "bravo", "charlie", "delta", "echo",
+    ]
+    assert q.correct_labels == ["E"]
+    assert q.needs_review is False
+    assert q.explanation is None
+
+
+def test_choose_two_with_merged_e_choice():
+    """A "Choose two" with green on A and the merged E — both must be correct."""
+    table = _make_question_table_with_merged_e(
+        qid=902,
+        choice_texts=("alpha", "bravo", "charlie", "delta", "echo"),
+        green_labels=("A", "E"),
+    )
+    q = classify_table(table, source_index=0)
+
+    assert q is not None
+    assert [c["label"] for c in q.choices] == ["A", "B", "C", "D", "E"]
+    assert q.correct_labels == ["A", "E"]
+    assert q.needs_review is False
+    assert q.explanation is None
+
+
+def test_explanation_after_merged_choice_e_stays_explanation():
+    """Regression guard: when a merged choice E is followed by an explanation
+    (the dual-merged-row case), reclamation must not eat the explanation.
+
+    Rule: choice E is green → reclaimed; the following dup row is non-green
+    and lives at ``last+2`` after reclaim, so it stays as explanation.
+    """
+    table = _make_question_table_with_merged_e(
+        qid=903,
+        choice_texts=("alpha", "bravo", "charlie", "delta", "echo"),
+        green_labels=("E",),
+        explanation="This is the explanation for the question.",
+    )
+    q = classify_table(table, source_index=0)
+
+    assert q is not None
+    assert [c["label"] for c in q.choices] == ["A", "B", "C", "D", "E"]
+    assert q.correct_labels == ["E"]
+    assert q.explanation == "This is the explanation for the question."
+    assert q.needs_review is False
+
+
+def test_short_english_explanation_not_misreclaimed_as_choice():
+    """Regression guard: a NON-green merged row at last+1 with no further
+    dup row is treated as an explanation, not a phantom choice E.
+
+    This protects against false positives on 4-choice questions whose
+    explanation happens to be short English prose.
+    """
+    doc = Document()
+    table = doc.add_table(rows=5, cols=2)
+    _set_cell_text(table.cell(0, 0), "Question #904")
+    _set_cell_text(table.cell(0, 1), "Topic 1 - Exam Pool A")
+    _set_cell_text(table.cell(1, 0), "Prompt EN.")
+    _set_cell_text(table.cell(1, 1), "Prompt EN.")
+    _set_cell_text(table.cell(2, 0), "alpha")
+    _set_cell_text(table.cell(2, 1), "bravo", green=True)
+    _set_cell_text(table.cell(3, 0), "charlie")
+    _set_cell_text(table.cell(3, 1), "delta")
+    # Merged non-green row at last+1: must be kept as explanation.
+    _set_cell_text(table.cell(4, 0), "Brief English explanation.")
+    _set_cell_text(table.cell(4, 1), "Brief English explanation.")
+    _merge_row(table, 4)
+
+    q = classify_table(table, source_index=0)
+    assert q is not None
+    assert [c["label"] for c in q.choices] == ["A", "B", "C", "D"]
+    assert q.correct_labels == ["B"]
+    assert q.explanation == "Brief English explanation."

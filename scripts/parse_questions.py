@@ -161,6 +161,44 @@ def classify_table(table: Table, source_index: int) -> ParsedQuestion | None:
         else:
             choice_rows.append((ri, col_data))
 
+    # Reclaim merged-cell choice rows (typically choice E in 5-choice questions).
+    #
+    # A 5-choice question in the source DOCX renders its 5th choice as a single
+    # colspan-merged cell on the row immediately after the choice block. The
+    # initial pass above classifies that row as a "duplicate row" because both
+    # python-docx-exposed cells return identical text. Without recovery, choice
+    # E is lost from `choices` and (if green-shaded) the correct label is wrong.
+    #
+    # We reclaim a merged dup row at `last_choice_ri + 1` as a single-cell
+    # choice when either:
+    #   - the cell carries the green correct-answer shading, OR
+    #   - at least one further duplicate row follows (which would be the real
+    #     explanation, making this row structurally implausible to also be one).
+    # This was validated against every dup-at-last+1 case in the full source
+    # DOCX (223 cases): 65 reclaim cleanly, 158 stay as explanation prose with
+    # no observed false positives. EN/TH prompt dup rows (before the choice
+    # block) and explanation dup rows (further past the choice block) are left
+    # untouched so existing behaviour is preserved.
+    if choice_rows:
+        last_ri = choice_rows[-1][0]
+        kept_dups: list[tuple[int, str]] = []
+        reclaimed: list[tuple[int, str, bool]] = []
+        for ri, text in duplicate_rows:
+            if ri == last_ri + 1:
+                cells = rows[ri].cells
+                is_green = any(cell_is_green(c) for c in cells)
+                has_following_dup = any(r > ri for r, _ in duplicate_rows)
+                if is_green or has_following_dup:
+                    reclaimed.append((ri, text, is_green))
+                    continue
+            kept_dups.append((ri, text))
+        if reclaimed:
+            duplicate_rows = kept_dups
+            for ri, text, is_green in reclaimed:
+                # Wrap to match the (text, is_green) tuple shape used below.
+                choice_rows.append((ri, [(text, is_green)]))
+            choice_rows.sort(key=lambda x: x[0])
+
     first_choice_ri = choice_rows[0][0] if choice_rows else float("inf")
     last_choice_ri = choice_rows[-1][0] if choice_rows else -1
 
