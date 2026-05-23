@@ -318,7 +318,10 @@
 
     <!-- LANDING -->
     <template x-if="view==='landing' && dashboard">
-      <div class="quiz-landing">
+      <div class="quiz-landing"
+           x-transition:enter="quiz-view-enter"
+           x-transition:enter-start="quiz-view-enter-start"
+           x-transition:enter-end="quiz-view-enter-end">
         <!-- Big mastery bar (hero style) -->
         <header class="quiz-hero">
           <div class="quiz-hero-left">
@@ -369,13 +372,16 @@
         </div>
 
         <!-- Reset link -->
-        <button class="quiz-reset-link" @click="resetProgress()">↻ Reset quiz progress</button>
+        <button class="quiz-reset-link" @click="resetProgress()">↻ Reset all quiz data</button>
       </div>
     </template>
 
     <!-- PRACTICE -->
-    <template x-if="view==='practice' && currentQ">
-      <div class="quiz-practice">
+    <template x-if="view==='practice' && currentQ" :key="currentQ.question_id">
+      <div class="quiz-practice"
+           x-transition:enter="quiz-view-enter"
+           x-transition:enter-start="quiz-view-enter-start"
+           x-transition:enter-end="quiz-view-enter-end">
         <header class="quiz-hero" style="margin-bottom: 24px;">
           <div class="quiz-hero-left">
             <div class="quiz-hero-stat">
@@ -391,7 +397,10 @@
           <div class="progress-track"><div class="progress-fill" :style="`width:${progressPct()}%`"></div></div>
         </header>
 
-        <div class="quiz-question" x-data="{ showTh: false }" x-init="$watch('currentQ', () => showTh = false)">
+        <div class="quiz-question" x-data="{ showTh: false }" x-init="$watch('currentQ', () => showTh = false)"
+             x-transition:enter="qadv-enter"
+             x-transition:enter-start="qadv-enter-start"
+             x-transition:enter-end="qadv-enter-end">
           <div class="quiz-prompt-row">
             <div class="quiz-prompt-en" x-show="!showTh" x-text="currentQ.prompt_en"></div>
             <div class="quiz-prompt-th" x-cloak x-show="showTh && currentQ.prompt_th" x-text="currentQ.prompt_th"></div>
@@ -457,7 +466,10 @@
 
     <!-- SUMMARY -->
     <template x-if="view==='summary' && finalSummary">
-      <div class="quiz-summary">
+      <div class="quiz-summary"
+           x-transition:enter="quiz-view-enter"
+           x-transition:enter-start="quiz-view-enter-start"
+           x-transition:enter-end="quiz-view-enter-end">
         <header class="quiz-hero" style="margin-bottom: 24px;">
           <div class="quiz-hero-left">
             <div class="quiz-hero-stat">
@@ -480,16 +492,14 @@
                 <details class="quiz-wrong-item" x-data="{ showTh: false }">
                   <summary>
                     <span x-text="`Q #${w.question_id}`"></span>
-                    <span class="quiz-wrong-prompt" x-text="w.prompt_en"></span>
+                    <span class="quiz-wrong-prompt"
+                          x-text="showTh && w.prompt_th ? w.prompt_th : w.prompt_en"></span>
+                    <button class="btn-brief quiz-lang-toggle"
+                            x-show="w.prompt_th"
+                            @click.stop.prevent="showTh = !showTh"
+                            x-text="showTh ? 'EN' : 'TH'"></button>
                   </summary>
                   <div class="quiz-wrong-body">
-                    <div class="quiz-prompt-row" x-show="w.prompt_th">
-                      <div class="quiz-prompt-en" x-show="!showTh" x-text="w.prompt_en"></div>
-                      <div class="quiz-prompt-th" x-cloak x-show="showTh" x-text="w.prompt_th"></div>
-                      <button class="btn-brief quiz-lang-toggle"
-                              @click.stop.prevent="showTh = !showTh"
-                              x-text="showTh ? 'EN' : 'TH'"></button>
-                    </div>
                     <ul class="quiz-wrong-choices">
                       <template x-for="c in w.choices" :key="c.label">
                         <li :class="{

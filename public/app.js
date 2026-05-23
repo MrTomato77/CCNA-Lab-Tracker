@@ -140,6 +140,13 @@ const Transitions = Object.freeze({
 window.Transitions = Transitions;
 
 // ── Fetch wrapper ─────────────────────────────────────────────────────────
+// Returns the parsed JSON envelope when the server speaks JSON, regardless
+// of HTTP status — the backend always wraps errors as {success:false,...}.
+// If the response isn't JSON (e.g. a router crash returning HTML 500) the
+// wrapper synthesizes a {success:false} envelope so callers don't blow up
+// on res.json() and can fall through to a generic error toast. The HTTP
+// status is bubbled up via .status so callers that care (e.g. quiz's 409
+// ALREADY_ANSWERED auto-advance) can branch on it.
 async function api(path, { method = 'GET', body = null } = {}) {
   const opts = { method };
   if (body !== null) {
@@ -147,7 +154,21 @@ async function api(path, { method = 'GET', body = null } = {}) {
     opts.body    = JSON.stringify(body);
   }
   const res = await fetch(path, opts);
-  return res.json();
+  const ctype = res.headers.get('content-type') || '';
+  if (!ctype.includes('application/json')) {
+    return { success: false, error: `HTTP ${res.status}`,
+             code: 'NON_JSON_RESPONSE', status: res.status };
+  }
+  try {
+    const json = await res.json();
+    if (typeof json === 'object' && json !== null && !('status' in json)) {
+      json.status = res.status;
+    }
+    return json;
+  } catch (e) {
+    return { success: false, error: 'Malformed JSON response',
+             code: 'BAD_JSON', status: res.status };
+  }
 }
 
 // ── Time formatting ───────────────────────────────────────────────────────
@@ -785,6 +806,7 @@ window.quizPage = function() {
         const json = await api(`/api/quiz/sessions/${this.sessionId}/next`);
         if (!json.success) {
           window.showToast("× " + json.error, "error");
+          this._stopTimer();
           this.view = "landing";
           return;
         }
@@ -796,7 +818,10 @@ window.quizPage = function() {
         this._qStartedAt = Date.now();
         this.view = "practice";
       } catch (e) {
+        // Network drop with the timer still ticking would burn battery and
+        // run a phantom session clock until the next nav — stop it here.
         window.showToast("× Network error", "error");
+        this._stopTimer();
         this.view = "landing";
       }
     },
@@ -827,6 +852,12 @@ window.quizPage = function() {
                   selected_labels: this.selection },
         });
         if (!json.success) {
+          // ALREADY_ANSWERED means a previous click already landed; advance
+          // instead of trapping the user on a dead question.
+          if (json.code === "ALREADY_ANSWERED") {
+            await this.fetchNext();
+            return;
+          }
           window.showToast("× " + json.error, "error");
           return;
         }
@@ -846,6 +877,10 @@ window.quizPage = function() {
         const json = await api(`/api/quiz/sessions/${this.sessionId}/dont-know`,
           { method: "POST", body: { question_id: this.currentQ.question_id } });
         if (!json.success) {
+          if (json.code === "ALREADY_ANSWERED") {
+            await this.fetchNext();
+            return;
+          }
           window.showToast("× " + json.error, "error");
           return;
         }
@@ -881,11 +916,17 @@ window.quizPage = function() {
     },
 
     async practiceAgain() {
-      const last = this.dashboard?.latest_session?.batch_size ?? 25;
+      // Prefer the finished session we just summarized, then fall back to
+      // the dashboard's latest. batch_size IS NULL in the DB means the
+      // session was ENDLESS — preserve that intent instead of silently
+      // shrinking the user down to a 25-card batch.
+      const prior = this.finalSummary ?? this.dashboard?.latest_session;
+      const lastBatch = prior?.batch_size;
+      const replay = lastBatch == null ? "ENDLESS" : lastBatch;
       this.sessionId    = null;
       this.finalSummary = null;
       await this.loadDashboard();   // refresh counts before relaunching
-      await this.startSession(last);
+      await this.startSession(replay);
     },
 
     async backToLanding() {
@@ -899,14 +940,17 @@ window.quizPage = function() {
 
     async resetProgress() {
       const ok = await Alpine.store("modal").show(
-        "This will reset all quiz mastery progress. Session history is kept.",
-        "Reset quiz progress", true,
+        "This will reset ALL quiz progress, sessions, and answer history. Question content is preserved.",
+        "Reset all quiz data", true,
       );
       if (!ok) return;
       try {
         const json = await api("/api/quiz/reset", { method: "POST" });
         if (json.success) {
-          window.showToast(`+ Reset ${json.data.cleared_progress} rows`, "success");
+          window.showToast(
+            `+ Cleared ${json.data.cleared_progress} progress, ${json.data.cleared_sessions} sessions, ${json.data.cleared_answers} answers`,
+            "success",
+          );
           await this.loadDashboard();
         } else {
           window.showToast("× " + json.error, "error");
