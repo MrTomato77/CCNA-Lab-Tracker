@@ -25,7 +25,7 @@ const TIMER_RESUME_CAP_SEC = 8 * 3600;
 
 // ── Transitions service ───────────────────────────────────────────────────
 // Single source of truth for animation timing and easings, mirrored in
-// CSS custom properties (:root in style.css). JS-driven follow-ups
+// CSS custom properties (:root in core/base.css). JS-driven follow-ups
 // (toasts, chart re-renders) should read from here so they can't drift
 // from the stylesheet.
 //

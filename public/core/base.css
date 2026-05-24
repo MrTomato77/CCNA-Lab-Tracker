@@ -7,7 +7,7 @@
   --font-sans:    "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono:    "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  /* Transition system — mirrored in window.Transitions (app.js). JS follow-ups
+  /* Transition system — mirrored in window.Transitions (core/main.js). JS follow-ups
      (toasts, chart rerenders) read from there so values can't drift. */
   --tx-duration-fast:    120ms;
   --tx-duration-normal:  200ms;
