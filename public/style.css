@@ -737,9 +737,6 @@
 /* ── Responsive ───────────────────────────────────────────────────────── */
 
 @media (max-width: 960px) {
-  .topnav-inner { padding: 14px 20px; gap: 16px; }
-  .brand-name { display: none; }
-  .nav-tab { padding: 6px 12px; font-size: 13px; }
   .page    { padding: 32px 20px 64px; }
   .hero    { grid-template-columns: 1fr; }
   .hero-right { align-items: flex-start; }
