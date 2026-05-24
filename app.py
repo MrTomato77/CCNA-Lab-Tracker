@@ -8,6 +8,7 @@ load_dotenv()
 setup_logging()
 
 from pathlib import Path
+import re
 import aiofiles
 from robyn import Robyn, Request, Response
 from loguru import logger
@@ -24,6 +25,62 @@ DOCS_DIR = (Path(__file__).parent / "docs").resolve()
 # intercepts non-GET methods on every path beneath it, returning 405 before POST routes match.
 _STATIC: dict[str, str] = {}
 _STATIC_BIN: dict[str, bytes] = {}
+
+
+def _load_static_recursive(root: Path) -> dict[str, str]:
+    """Walk *root* and return {relative_path: text_content} for every .html/.css/.js.
+
+    Paths are POSIX-style relative to *root* (e.g. "nav/nav.css") so they match
+    the URL routes Robyn will serve them from. Binary assets (logo.ico) are
+    handled separately by ``_STATIC_BIN``.
+    """
+    exts = {".html", ".css", ".js"}
+    out: dict[str, str] = {}
+    for path in root.rglob("*"):
+        if path.is_file() and path.suffix in exts:
+            rel = path.relative_to(root).as_posix()
+            out[rel] = path.read_text(encoding="utf-8")
+    return out
+
+
+_INCLUDE_RE = re.compile(r"<!--INCLUDE:([\w./-]+)-->")
+
+
+def _build_index(static: dict[str, str]) -> str:
+    """Replace ``<!--INCLUDE:relative/path.html-->`` markers in
+    ``static['index.html']`` with the matching entry from *static*.
+
+    Single-pass, non-recursive: a partial containing an INCLUDE marker
+    leaves the marker as a literal in the output. Unknown markers raise
+    KeyError at boot — fail loud, never silently.
+    """
+    shell = static["index.html"]
+
+    def _sub(match: re.Match[str]) -> str:
+        key = match.group(1)
+        if key not in static:
+            raise KeyError(f"INCLUDE marker references unknown partial: {key}")
+        return static[key]
+
+    return _INCLUDE_RE.sub(_sub, shell)
+
+
+_CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css":  "text/css; charset=utf-8",
+    ".js":   "application/javascript; charset=utf-8",
+}
+
+_SAFE_STATIC_RE = re.compile(r"^[a-z0-9_-]+(/[a-z0-9_-]+)*\.(html|css|js)$")
+
+
+def _resolve_static_path(rel: str) -> "str | None":
+    """Validate *rel* (POSIX, no leading slash, no '..') and return it, or None."""
+    if not _SAFE_STATIC_RE.fullmatch(rel):
+        return None
+    return rel
+
+
 @app.get("/")
 async def index(request: Request) -> Response:
     return Response(
@@ -32,20 +89,33 @@ async def index(request: Request) -> Response:
         description=_STATIC["index.html"],
     )
 
-@app.get("/style.css")
-async def style_css(request: Request) -> Response:
+@app.get("/:path")
+async def static_file(request: Request) -> Response:
+    """Serve any preloaded static file (single-segment path). Path must match _SAFE_STATIC_RE."""
+    rel = request.path_params.get("path", "")
+    safe = _resolve_static_path(rel)
+    if safe is None or safe not in _STATIC:
+        return Response(status_code=404, headers={}, description="Not found")
+    ext = "." + safe.rsplit(".", 1)[-1]
     return Response(
         status_code=200,
-        headers={"Content-Type": "text/css; charset=utf-8"},
-        description=_STATIC["style.css"],
+        headers={"Content-Type": _CONTENT_TYPES.get(ext, "text/plain")},
+        description=_STATIC[safe],
     )
 
-@app.get("/app.js")
-async def app_js(request: Request) -> Response:
+# Robyn 0.64 /:path matches ONE segment only — add a second route for two-segment nested paths.
+@app.get("/:dir/:filename")
+async def static_file_nested(request: Request) -> Response:
+    """Serve nested static files (two-segment paths, e.g. nav/nav.css)."""
+    rel = f"{request.path_params.get('dir', '')}/{request.path_params.get('filename', '')}"
+    safe = _resolve_static_path(rel)
+    if safe is None or safe not in _STATIC:
+        return Response(status_code=404, headers={}, description="Not found")
+    ext = "." + safe.rsplit(".", 1)[-1]
     return Response(
         status_code=200,
-        headers={"Content-Type": "application/javascript; charset=utf-8"},
-        description=_STATIC["app.js"],
+        headers={"Content-Type": _CONTENT_TYPES.get(ext, "text/plain")},
+        description=_STATIC[safe],
     )
 
 @app.get("/logo.ico")
@@ -112,8 +182,10 @@ async def startup() -> None:
     from services.pt_launcher import PT_EXE
     labs_dir = Path(__file__).parent / "labs"
     labs_dir.mkdir(exist_ok=True)
-    for name in ("index.html", "style.css", "app.js"):
-        _STATIC[name] = (PUBLIC / name).read_text(encoding="utf-8")
+    raw = _load_static_recursive(PUBLIC)
+    _STATIC.update(raw)
+    # Stitch the shell — overwrites the raw shell with the fully assembled HTML.
+    _STATIC["index.html"] = _build_index(raw)
     _STATIC_BIN["logo.ico"] = (PUBLIC / "logo.ico").read_bytes()
     await init_db()
     # Warn but don't fail — user may browse progress without PT installed.
