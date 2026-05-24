@@ -1,0 +1,20 @@
+  <nav class="topnav">
+    <div class="topnav-inner">
+      <div class="brand">
+        <span class="brand-mark">◆</span>
+        <span class="brand-name">CCNA Lab Tracker</span>
+      </div>
+      <div class="nav-tabs">
+        <button class="nav-tab" @click="page='dashboard'" :class="{active: page==='dashboard'}">Practical</button>
+        <button class="nav-tab" @click="page='quiz'"      :class="{active: page==='quiz'}">Quiz</button>
+        <button class="nav-tab" @click="page='import'"    :class="{active: page==='import'}">Import</button>
+        <button class="nav-tab" @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
+      </div>
+      <div class="nav-utility">
+        <button class="theme-toggle" @click="toggleTheme()"
+                :title="`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`"
+                x-text="theme === 'light' ? '☾' : '☀'"></button>
+        <button class="nav-reset" @click="resetAllLabs()">↻ Reset all</button>
+      </div>
+    </div>
+  </nav>

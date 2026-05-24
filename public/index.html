@@ -22,6 +22,8 @@
   <link rel="stylesheet" href="core/tokens.css">
   <link rel="stylesheet" href="core/base.css">
   <link rel="stylesheet" href="core/components.css">
+  <link rel="stylesheet" href="nav/nav.css">
+  <link rel="stylesheet" href="modals/modals.css">
   <link rel="stylesheet" href="style.css">
   <!-- Chart.js MUST load before Alpine (synchronous) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -32,26 +34,7 @@
 </head>
 <body x-data="appShell()" x-init="init()">
 
-  <nav class="topnav">
-    <div class="topnav-inner">
-      <div class="brand">
-        <span class="brand-mark">◆</span>
-        <span class="brand-name">CCNA Lab Tracker</span>
-      </div>
-      <div class="nav-tabs">
-        <button class="nav-tab" @click="page='dashboard'" :class="{active: page==='dashboard'}">Practical</button>
-        <button class="nav-tab" @click="page='quiz'"      :class="{active: page==='quiz'}">Quiz</button>
-        <button class="nav-tab" @click="page='import'"    :class="{active: page==='import'}">Import</button>
-        <button class="nav-tab" @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
-      </div>
-      <div class="nav-utility">
-        <button class="theme-toggle" @click="toggleTheme()"
-                :title="`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`"
-                x-text="theme === 'light' ? '☾' : '☀'"></button>
-        <button class="nav-reset" @click="resetAllLabs()">↻ Reset all</button>
-      </div>
-    </div>
-  </nav>
+  <!--INCLUDE:nav/nav.html-->
 
   <!-- DASHBOARD -->
   <div class="page" x-show="page==='dashboard'">
@@ -548,96 +531,7 @@
     </template>
   </div>
 
-  <!-- Confirm Modal -->
-  <div class="modal-backdrop" x-show="$store.modal.open" x-cloak
-    @click="$store.modal.cancel()"
-    @keydown.escape.window="$store.modal.cancel()">
-    <div class="modal" @click.stop>
-      <div class="modal-title" x-show="$store.modal.title" x-text="$store.modal.title"></div>
-      <p class="modal-message" x-text="$store.modal.message"></p>
-      <div class="modal-actions">
-        <button class="modal-btn modal-btn--cancel" @click="$store.modal.cancel()">Cancel</button>
-        <button class="modal-btn modal-btn--ok" :class="{ 'modal-btn--danger': $store.modal.danger }"
-          @click="$store.modal.ok()">Confirm</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Summary (Brief) Modal -->
-  <div class="modal-backdrop" x-show="$store.summaryModal.open" x-cloak
-    @click="$store.summaryModal.close()"
-    @keydown.escape.window="$store.summaryModal.close()">
-    <div class="modal summary-modal" @click.stop>
-      <button class="btn-modal-close" type="button" aria-label="Close"
-        @click="$store.summaryModal.close()">×</button>
-      <div class="modal-title">
-        <span x-text="$store.summaryModal.lab?.id"></span>
-        ·
-        <span x-text="$store.summaryModal.lab?.name"></span>
-      </div>
-
-      <template x-if="$store.summaryModal.loading">
-        <p class="modal-message">Loading…</p>
-      </template>
-      <template x-if="$store.summaryModal.error">
-        <p class="modal-message" x-text="$store.summaryModal.error"></p>
-      </template>
-
-      <template x-if="$store.summaryModal.data">
-        <div class="summary-body">
-          <template x-if="$store.summaryModal.data.summary">
-            <section>
-              <h4>Summary</h4>
-              <p x-text="$store.summaryModal.data.summary"></p>
-            </section>
-          </template>
-
-          <template x-if="$store.summaryModal.data.core_commands?.length">
-            <section>
-              <h4>Core commands</h4>
-              <ul class="cmd-list">
-                <template x-for="c in $store.summaryModal.data.core_commands" :key="c.cmd">
-                  <li><code x-text="c.cmd"></code><span class="cmd-note" x-text="c.note"></span></li>
-                </template>
-              </ul>
-            </section>
-          </template>
-
-          <template x-if="$store.summaryModal.data.verify_commands?.length">
-            <section>
-              <h4>Verify / show</h4>
-              <ul class="cmd-list">
-                <template x-for="c in $store.summaryModal.data.verify_commands" :key="c.cmd">
-                  <li><code x-text="c.cmd"></code><span class="cmd-note" x-text="c.note"></span></li>
-                </template>
-              </ul>
-            </section>
-          </template>
-
-          <template x-if="$store.summaryModal.data.gotchas?.length">
-            <section>
-              <h4>Watch out for</h4>
-              <ul class="gotcha-list">
-                <template x-for="g in $store.summaryModal.data.gotchas" :key="g">
-                  <li x-text="g"></li>
-                </template>
-              </ul>
-            </section>
-          </template>
-        </div>
-      </template>
-
-    </div>
-  </div>
-
-  <!-- Image Modal (fullscreen) -->
-  <div class="modal-backdrop image-modal-backdrop" x-show="$store.imageModal.open" x-cloak
-    @click="$store.imageModal.close()"
-    @keydown.escape.window="$store.imageModal.close()">
-    <img class="image-modal-img" :src="$store.imageModal.url" alt="" @click.stop>
-    <button class="btn-modal-close" type="button" aria-label="Close"
-      @click="$store.imageModal.close()">×</button>
-  </div>
+  <!--INCLUDE:modals/modals.html-->
 
 </body>
 </html>

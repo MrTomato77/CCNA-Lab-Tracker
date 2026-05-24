@@ -1,0 +1,149 @@
+/* Summary + image modal decorations. Generic confirm/summary modal styling lives in core/components.css. */
+
+/* Compound selector raises specificity over .modal (max-width: 400px).
+   position:relative anchors the absolute close button. */
+.modal.summary-modal {
+  max-width: 720px;
+  width: 92vw;
+  position: relative;
+}
+
+.btn-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-3);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-modal-close:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.btn-modal-close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.summary-body {
+  max-height: 60vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 12px 0;
+  scrollbar-width: thin;  /* Firefox */
+  scrollbar-color: var(--border-2) transparent;
+}
+.summary-body::-webkit-scrollbar {
+  width: 8px;
+}
+.summary-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.summary-body::-webkit-scrollbar-thumb {
+  background: var(--border-2);
+  border-radius: 4px;
+}
+.summary-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-4);
+}
+.summary-body section {
+  margin: 0;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+}
+/* Alpine <template> nodes prevent :first-child — :first-of-type drops the divider correctly. */
+.summary-body section:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+.summary-body h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+.summary-body p {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.6;
+  font-size: 13px;
+}
+
+.cmd-list, .gotcha-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cmd-list li {
+  display: block;
+  padding: 6px 0;
+  line-height: 1.75;
+}
+.cmd-list code {
+  display: inline-block;
+  max-width: 100%;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  background: var(--surface-2);
+  color: var(--accent-text);
+  padding: 3px 9px;
+  border-radius: 4px;
+  vertical-align: baseline;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+.cmd-note {
+  margin-left: 8px;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.gotcha-list li {
+  position: relative;
+  padding-left: 20px;
+  margin: 8px 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.gotcha-list li::before {
+  content: "!";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--in-progress);
+  font-weight: 700;
+}
+
+/* Fullscreen image viewer — body-level Alpine store-backed modal */
+.image-modal-backdrop {
+  z-index: 9999;
+  cursor: zoom-out;
+}
+.image-modal-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+.image-modal-backdrop .btn-modal-close {
+  position: fixed;
+  top: 20px;
+  right: 28px;
+  z-index: 10000;
+}
