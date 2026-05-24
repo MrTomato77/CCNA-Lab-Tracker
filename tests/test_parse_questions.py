@@ -325,3 +325,96 @@ def test_cell_text_preserves_paragraph_newlines():
         cell.add_paragraph(line)
 
     assert _cell_text(cell) == "line1\nline2\nline3"
+
+
+# ---------- multi-paragraph EN prompt join test ----------
+
+def test_prompt_en_joins_multiple_english_dup_rows():
+    """Q#435 pattern: a Cisco config block on one dup-row, the actual question
+    on another. Both must surface in ``prompt_en`` separated by a blank line.
+    Previously the parser used ``next()`` and silently dropped everything after
+    the first English dup-row.
+    """
+    doc = Document()
+    table = doc.add_table(rows=6, cols=2)
+    _set_cell_text(table.cell(0, 0), "Question #905")
+    _set_cell_text(table.cell(0, 1), "Topic 2 - Exam Pool B")
+    # Row 1 — config block (English, first dup-row)
+    config = "interface Gi1/0\nduplex full\nspeed 100"
+    _set_cell_text(table.cell(1, 0), config)
+    _set_cell_text(table.cell(1, 1), config)
+    # Row 2 — actual question (English, second dup-row)
+    question = "An engineer configures interface Gi1/0. Which action is necessary?"
+    _set_cell_text(table.cell(2, 0), question)
+    _set_cell_text(table.cell(2, 1), question)
+    # Rows 3-4 — choices
+    _set_cell_text(table.cell(3, 0), "alpha")
+    _set_cell_text(table.cell(3, 1), "bravo", green=True)
+    _set_cell_text(table.cell(4, 0), "charlie")
+    _set_cell_text(table.cell(4, 1), "delta")
+    # Row 5 — explanation (English, third dup-row but POST-choice, not joined)
+    _set_cell_text(table.cell(5, 0), "Because LLDP-MED is required.")
+    _set_cell_text(table.cell(5, 1), "Because LLDP-MED is required.")
+
+    q = classify_table(table, source_index=0)
+    assert q is not None
+    assert q.prompt_en == f"{config}\n\n{question}"
+    assert q.explanation == "Because LLDP-MED is required."
+    assert [c["label"] for c in q.choices] == ["A", "B", "C", "D"]
+    assert q.correct_labels == ["B"]
+
+
+def test_prompt_th_joins_multiple_thai_dup_rows():
+    """Same idea but for Thai prompts — translations occasionally span
+    two paragraphs (context + question) in the source DOCX.
+    """
+    doc = Document()
+    table = doc.add_table(rows=5, cols=2)
+    _set_cell_text(table.cell(0, 0), "Question #906")
+    _set_cell_text(table.cell(0, 1), "Topic 3 - Exam Pool C")
+    th_context = "บริบทภาษาไทยส่วนต้น"
+    th_question = "คำถามภาษาไทยส่วนที่สอง"
+    _set_cell_text(table.cell(1, 0), th_context)
+    _set_cell_text(table.cell(1, 1), th_context)
+    _set_cell_text(table.cell(2, 0), th_question)
+    _set_cell_text(table.cell(2, 1), th_question)
+    _set_cell_text(table.cell(3, 0), "alpha", green=True)
+    _set_cell_text(table.cell(3, 1), "bravo")
+    _set_cell_text(table.cell(4, 0), "charlie")
+    _set_cell_text(table.cell(4, 1), "delta")
+
+    q = classify_table(table, source_index=0)
+    assert q is not None
+    assert q.prompt_th == f"{th_context}\n\n{th_question}"
+    assert q.prompt_en == ""  # no English dup-rows
+    assert q.correct_labels == ["A"]
+
+
+def test_prompt_th_picks_mixed_english_thai_row():
+    """Q#840 pattern: a Thai translation row that inlines many English
+    technical terms (so ASCII letters > Thai chars). Must still bucket
+    into ``prompt_th`` because it has Thai content, not into ``prompt_en``.
+    """
+    doc = Document()
+    table = doc.add_table(rows=5, cols=2)
+    _set_cell_text(table.cell(0, 0), "Question #907")
+    _set_cell_text(table.cell(0, 1), "Topic 4 - Exam Pool D")
+    en_prompt = "A network engineer must migrate a loopback interface to IPv6."
+    # This Thai row is mostly English by ASCII-letter count but is still
+    # the Thai translation. The fix buckets ANY Thai content as TH.
+    th_mixed = ("วิศวกรเครือข่ายจะต้อง Migrate Router loopback interface "
+                "ไปยัง IPv6 address space")
+    _set_cell_text(table.cell(1, 0), en_prompt)
+    _set_cell_text(table.cell(1, 1), en_prompt)
+    _set_cell_text(table.cell(2, 0), th_mixed)
+    _set_cell_text(table.cell(2, 1), th_mixed)
+    _set_cell_text(table.cell(3, 0), "/64", green=True)
+    _set_cell_text(table.cell(3, 1), "/96")
+    _set_cell_text(table.cell(4, 0), "/124")
+    _set_cell_text(table.cell(4, 1), "/128")
+
+    q = classify_table(table, source_index=0)
+    assert q is not None
+    assert q.prompt_en == en_prompt
+    assert q.prompt_th == th_mixed
+    assert q.correct_labels == ["A"]

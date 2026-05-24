@@ -102,6 +102,19 @@ def is_mostly_thai(text: str) -> bool:
     return thai > ascii_letters
 
 
+def _has_thai_content(text: str) -> bool:
+    """True when *text* contains ANY Thai character.
+
+    Used to bucket pre-choice duplicate rows into prompt_en vs prompt_th:
+    Thai translation rows in this DOCX frequently inline English technical
+    terms (e.g. "Migrate Router loopback interface ไปยัง IPv6 address space"),
+    so they may have more ASCII letters than Thai characters and fail
+    ``is_mostly_thai``. Any Thai character at all marks the row as the
+    Thai translation rather than the English original.
+    """
+    return bool(text) and bool(THAI_RE.search(text))
+
+
 def cell_is_green(cell: _Cell) -> bool:
     """True if any run inside *cell* carries the green shading fill."""
     for paragraph in cell.paragraphs:
@@ -210,8 +223,14 @@ def classify_table(table: Table, source_index: int) -> ParsedQuestion | None:
     pre_choice_dups  = [t for ri, t in duplicate_rows if ri < first_choice_ri]
     post_choice_dups = [t for ri, t in duplicate_rows if ri > last_choice_ri]
 
-    prompt_en = next((t for t in pre_choice_dups if not is_mostly_thai(t)), "")
-    prompt_th = next((t for t in pre_choice_dups if is_mostly_thai(t)), None)
+    # Join all pre-choice English (and Thai) dup-rows with a paragraph break.
+    # Some questions have a config block on one dup-row and the actual question
+    # on another (e.g. Q#435: "interface Gi1/0\n..." then "An engineer
+    # configures..."). Picking only the first row would drop the question.
+    en_dups = [t for t in pre_choice_dups if not _has_thai_content(t)]
+    th_dups = [t for t in pre_choice_dups if _has_thai_content(t)]
+    prompt_en = "\n\n".join(en_dups) if en_dups else ""
+    prompt_th = "\n\n".join(th_dups) if th_dups else None
 
     choices: list[dict[str, str]] = []
     correct_labels: list[str] = []

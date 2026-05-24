@@ -1635,8 +1635,16 @@ a { color: inherit; text-decoration: none; }
   transition: transform 200ms var(--tx-easing-default);
 }
 .quiz-wrong-chevron.is-open { transform: rotate(90deg); }
-.quiz-wrong-prompt { font-weight: 400; color: var(--text-2); white-space: pre-line; }
-.quiz-wrong-body { margin-top: 10px; }
+.quiz-wrong-prompt {
+  flex: 1;             /* pushes lang-toggle + chevron to the right */
+  font-weight: 400;
+  color: var(--text-2);
+  white-space: pre-line;
+}
+.quiz-wrong-body {
+  margin-top: 10px;
+  padding: 0 6px 4px;  /* horizontal inset so choices don't hit card edges */
+}
 .quiz-wrong-choices {
   list-style: none;
   padding: 0;
