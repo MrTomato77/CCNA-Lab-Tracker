@@ -33,11 +33,14 @@ def _load_static_recursive(root: Path) -> dict[str, str]:
     Paths are POSIX-style relative to *root* (e.g. "nav/nav.css") so they match
     the URL routes Robyn will serve them from. Binary assets (logo.ico) are
     handled separately by ``_STATIC_BIN``.
+
+    Symlinks are skipped to prevent escape via a planted symlink in public/
+    that points to files outside the tree.
     """
     exts = {".html", ".css", ".js"}
     out: dict[str, str] = {}
     for path in root.rglob("*"):
-        if path.is_file() and path.suffix in exts:
+        if path.is_file() and not path.is_symlink() and path.suffix in exts:
             rel = path.relative_to(root).as_posix()
             out[rel] = path.read_text(encoding="utf-8")
     return out
@@ -89,6 +92,23 @@ async def index(request: Request) -> Response:
         description=_STATIC["index.html"],
     )
 
+def _static_response(safe: str) -> Response:
+    """Build a 200 Response for a validated *safe* static-file key.
+
+    Caller is responsible for ensuring *safe* is already in ``_STATIC``
+    (call ``_resolve_static_path`` first). Reads content-type from
+    ``_CONTENT_TYPES``; falls back to ``text/plain`` for unknown
+    extensions (defensive — should not occur because the whitelist regex
+    only permits .html/.css/.js).
+    """
+    ext = "." + safe.rsplit(".", 1)[-1]
+    return Response(
+        status_code=200,
+        headers={"Content-Type": _CONTENT_TYPES.get(ext, "text/plain")},
+        description=_STATIC[safe],
+    )
+
+
 @app.get("/:path")
 async def static_file(request: Request) -> Response:
     """Serve any preloaded static file (single-segment path). Path must match _SAFE_STATIC_RE."""
@@ -96,12 +116,8 @@ async def static_file(request: Request) -> Response:
     safe = _resolve_static_path(rel)
     if safe is None or safe not in _STATIC:
         return Response(status_code=404, headers={}, description="Not found")
-    ext = "." + safe.rsplit(".", 1)[-1]
-    return Response(
-        status_code=200,
-        headers={"Content-Type": _CONTENT_TYPES.get(ext, "text/plain")},
-        description=_STATIC[safe],
-    )
+    return _static_response(safe)
+
 
 # Robyn 0.64 /:path matches ONE segment only — add a second route for two-segment nested paths.
 @app.get("/:dir/:filename")
@@ -111,12 +127,7 @@ async def static_file_nested(request: Request) -> Response:
     safe = _resolve_static_path(rel)
     if safe is None or safe not in _STATIC:
         return Response(status_code=404, headers={}, description="Not found")
-    ext = "." + safe.rsplit(".", 1)[-1]
-    return Response(
-        status_code=200,
-        headers={"Content-Type": _CONTENT_TYPES.get(ext, "text/plain")},
-        description=_STATIC[safe],
-    )
+    return _static_response(safe)
 
 @app.get("/logo.ico")
 async def logo_ico(request: Request) -> Response:

@@ -63,7 +63,7 @@ def test_build_index_does_not_recurse():
     assert _build_index(static) == "<!--INCLUDE:b.html-->"
 
 
-def test_serve_static_rejects_path_traversal(monkeypatch):
+def test_serve_static_rejects_path_traversal():
     """`..` segments in a static URL must 404, not escape PUBLIC/."""
     from app import _resolve_static_path
 
