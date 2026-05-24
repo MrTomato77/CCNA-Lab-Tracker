@@ -397,10 +397,7 @@
           <div class="progress-track"><div class="progress-fill" :style="`width:${progressPct()}%`"></div></div>
         </header>
 
-        <div class="quiz-question" x-data="{ showTh: false }" x-init="$watch('currentQ', () => showTh = false)"
-             x-transition:enter="qadv-enter"
-             x-transition:enter-start="qadv-enter-start"
-             x-transition:enter-end="qadv-enter-end">
+        <div class="quiz-question" x-data="{ showTh: false }" x-init="$watch('currentQ', () => showTh = false)">
           <div class="quiz-prompt-row">
             <div class="quiz-prompt-en" x-show="!showTh" x-text="currentQ.prompt_en"></div>
             <div class="quiz-prompt-th" x-cloak x-show="showTh && currentQ.prompt_th" x-text="currentQ.prompt_th"></div>
@@ -437,7 +434,9 @@
                       :disabled="feedback !== null"
                       @click="toggleChoice(choice.label)">
                 <span class="quiz-choice-label" x-text="choice.label"></span>
-                <span class="quiz-choice-text"  x-text="choice.text"></span>
+                <span class="quiz-choice-text"
+                      :class="{ 'quiz-choice-text--mono': isCiscoText(choice.text) }"
+                      x-text="choice.text"></span>
               </button>
             </template>
           </div>
@@ -489,32 +488,48 @@
           <div>
             <div class="quiz-wrong-list">
               <template x-for="w in finalSummary.wrong_answers" :key="w.question_id">
-                <details class="quiz-wrong-item" x-data="{ showTh: false }">
-                  <summary>
-                    <span x-text="`Q #${w.question_id}`"></span>
+                <div class="quiz-wrong-item" x-data="{ open: false, showTh: false }">
+                  <!-- div+role="button" because nested <button> would be invalid HTML
+                       (browser auto-moves the inner toggle out of the outer button,
+                       breaking Alpine's @click scope and the x-transition lifecycle). -->
+                  <div class="quiz-wrong-summary"
+                       role="button"
+                       tabindex="0"
+                       :aria-expanded="open"
+                       @click="open = !open"
+                       @keydown.enter.prevent="open = !open"
+                       @keydown.space.prevent="open = !open">
                     <span class="quiz-wrong-prompt"
                           x-text="showTh && w.prompt_th ? w.prompt_th : w.prompt_en"></span>
-                    <button class="btn-brief quiz-lang-toggle"
+                    <button type="button"
+                            class="btn-brief quiz-lang-toggle"
                             x-show="w.prompt_th"
-                            @click.stop.prevent="showTh = !showTh"
+                            @click.stop="showTh = !showTh"
                             x-text="showTh ? 'EN' : 'TH'"></button>
-                  </summary>
-                  <div class="quiz-wrong-body">
-                    <ul class="quiz-wrong-choices">
-                      <template x-for="c in w.choices" :key="c.label">
-                        <li :class="{
-                              'wrong-choice--correct': w.correct_labels.includes(c.label),
-                              'wrong-choice--yours':   w.selected_labels.includes(c.label)
-                            }">
-                          <strong x-text="c.label"></strong>
-                          <span x-text="c.text"></span>
-                        </li>
-                      </template>
-                    </ul>
-                    <p class="quiz-feedback-explanation"
-                       x-show="w.explanation" x-text="w.explanation"></p>
+                    <span class="quiz-wrong-chevron" :class="{ 'is-open': open }">›</span>
                   </div>
-                </details>
+                  <!-- grid-rows trick: outer is display:grid with rows transitioning
+                       0fr ↔ 1fr; inner clips with overflow:hidden. Avoids Alpine's
+                       x-transition machinery which threw uncaught promise rejections
+                       on every toggle for our class names. -->
+                  <div class="quiz-wrong-body-wrap" :class="{ 'is-open': open }">
+                    <div class="quiz-wrong-body">
+                      <ul class="quiz-wrong-choices">
+                        <template x-for="c in w.choices" :key="c.label">
+                          <li :class="{
+                                'wrong-choice--correct': w.correct_labels.includes(c.label),
+                                'wrong-choice--yours':   w.selected_labels.includes(c.label)
+                              }">
+                            <strong x-text="c.label"></strong>
+                            <span x-text="c.text"></span>
+                          </li>
+                        </template>
+                      </ul>
+                      <p class="quiz-feedback-explanation"
+                         x-show="w.explanation" x-text="w.explanation"></p>
+                    </div>
+                  </div>
+                </div>
               </template>
             </div>
           </div>

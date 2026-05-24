@@ -119,7 +119,12 @@ def cell_is_green(cell: _Cell) -> bool:
 
 
 def _cell_text(cell: _Cell) -> str:
-    return " ".join(p.text for p in cell.paragraphs).strip()
+    """Join paragraphs with newline so multi-line config / explanations
+    keep their structure. Downstream rendering uses ``white-space: pre-line``
+    to display them; callers that want a single-line representation can
+    still ``.replace('\\n', ' ')``.
+    """
+    return "\n".join(p.text for p in cell.paragraphs).strip()
 
 
 def classify_table(table: Table, source_index: int) -> ParsedQuestion | None:

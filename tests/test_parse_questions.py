@@ -14,6 +14,7 @@ from docx.table import Table, _Cell
 from scripts.parse_questions import (
     GREEN_FILL,
     SOURCE_DOCX,
+    _cell_text,
     classify_table,
     extract_table_images,
     is_mostly_thai,
@@ -306,3 +307,21 @@ def test_short_english_explanation_not_misreclaimed_as_choice():
     assert [c["label"] for c in q.choices] == ["A", "B", "C", "D"]
     assert q.correct_labels == ["B"]
     assert q.explanation == "Brief English explanation."
+
+
+# ---------- newline-preservation test for _cell_text ----------
+
+def test_cell_text_preserves_paragraph_newlines():
+    """Multi-paragraph cells must surface ``\\n`` between paragraphs so
+    Cisco-config blocks and explanations keep their line structure.
+    """
+    doc = Document()
+    table = doc.add_table(rows=1, cols=1)
+    cell = table.cell(0, 0)
+    # Clear the default empty paragraph python-docx inserts, then add three.
+    for p in list(cell.paragraphs):
+        p._element.getparent().remove(p._element)
+    for line in ("line1", "line2", "line3"):
+        cell.add_paragraph(line)
+
+    assert _cell_text(cell) == "line1\nline2\nline3"

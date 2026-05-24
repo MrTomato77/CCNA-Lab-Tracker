@@ -977,6 +977,16 @@ function bindStatsThemeListener(getCurrent) {
   });
 }
 
+// ── Cisco-text detector ───────────────────────────────────────────────
+// Heuristic: text is Cisco CLI / config if it matches any common prompt or
+// configuration directive. Used by the practice view to render config-style
+// choices in monospace so the columns and punctuation actually read.
+const CISCO_RE = /Switch\(config|Router\(config|R\d+\(config|\binterface\s+\w|\bswitchport\s|\bspanning-tree\s|\bip\s+route\s|\bip\s+address\s|^\s*conf\s+t\b|^\s*en\b/im;
+function isCiscoText(text) {
+  return typeof text === "string" && CISCO_RE.test(text);
+}
+window.isCiscoText = isCiscoText;
+
 // ── Toast Service ─────────────────────────────────────────────────────
 window.showToast = function(message, type = 'info', duration = 1800) {
   const toast = document.createElement('div');

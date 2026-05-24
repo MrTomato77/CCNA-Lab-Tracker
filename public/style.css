@@ -1529,6 +1529,12 @@ a { color: inherit; text-decoration: none; }
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
+/* Odd choice count → last cell spans the full row. Uses :nth-of-type
+   instead of :nth-child because Alpine's x-for keeps a hidden
+   <template> sibling that would otherwise offset the count by 1. */
+.quiz-choices > .quiz-choice:last-of-type:nth-of-type(odd) {
+  grid-column: span 2;
+}
 .quiz-choice {
   display: flex;
   align-items: flex-start;
@@ -1556,12 +1562,17 @@ a { color: inherit; text-decoration: none; }
 }
 .quiz-choice--correct .quiz-choice-label { color: var(--done); }
 .quiz-choice--wrong   .quiz-choice-label { color: var(--reset); }
-.quiz-choice-text    { 
+.quiz-choice-text    {
   flex: 1;
   font-size: 14px;
   line-height: 1.5;
   word-break: break-word;
   align-self: center;
+  white-space: pre-line;
+}
+.quiz-choice-text--mono {
+  font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
 }
 
 /* Feedback */
@@ -1603,13 +1614,27 @@ a { color: inherit; text-decoration: none; }
   border-radius: 8px;
   padding: 10px 14px;
 }
-.quiz-wrong-item > summary {
-  cursor: pointer;
-  font-weight: 500;
+.quiz-wrong-summary {
   display: flex;
-  gap: 10px;
   align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
 }
+.quiz-wrong-chevron {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 200ms var(--tx-easing-default);
+}
+.quiz-wrong-chevron.is-open { transform: rotate(90deg); }
 .quiz-wrong-prompt { font-weight: 400; color: var(--text-2); white-space: pre-line; }
 .quiz-wrong-body { margin-top: 10px; }
 .quiz-wrong-choices {
@@ -1655,13 +1680,33 @@ a { color: inherit; text-decoration: none; }
 .quiz-view-enter-start { opacity: 0; transform: translateY(4px); }
 .quiz-view-enter-end   { opacity: 1; transform: none; }
 
-/* Question-advance fade (slide-in from right) */
-.qadv-enter {
-  transition: opacity 200ms var(--tx-easing-default),
-              transform 200ms var(--tx-easing-default);
+/* Question-advance slide-in (keyframe — fires on keyed remount of .quiz-question) */
+@keyframes qadv-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: none; }
 }
-.qadv-enter-start { opacity: 0; transform: translateX(8px); }
-.qadv-enter-end   { opacity: 1; transform: none; }
+.quiz-question {
+  animation: qadv-in 240ms var(--tx-easing-default);
+}
+
+/* Collapse animation for summary wrong-answer body.
+   Wrapper transitions max-height 0 → 1200px + opacity 0 → 1 when
+   .is-open is set by Alpine. Used a class-toggle pattern (not Alpine
+   x-transition) because Alpine's enter/leave class machinery threw
+   uncaught promise rejections on our class names. max-height ceiling
+   is generous; longest wrong-answer body in practice is well under
+   1000px (4–5 choices + explanation). */
+.quiz-wrong-body-wrap {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 220ms var(--tx-easing-default),
+              opacity 200ms var(--tx-easing-default);
+}
+.quiz-wrong-body-wrap.is-open {
+  max-height: 1200px;
+  opacity: 1;
+}
 
 /* Choice feedback flash */
 @keyframes quizCorrectFlash {
@@ -1679,7 +1724,8 @@ a { color: inherit; text-decoration: none; }
 .quiz-choice--wrong { animation: quizWrongShake 280ms ease both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .quiz-view-enter, .qadv-enter,
+  .quiz-view-enter, .quiz-question,
+  .quiz-wrong-body-wrap, .quiz-wrong-chevron,
   .quiz-choice--correct, .quiz-choice--wrong {
     transition: none;
     animation: none;
