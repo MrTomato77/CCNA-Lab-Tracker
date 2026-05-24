@@ -1,0 +1,76 @@
+/* ── Light (default) ──────────────────────────────────────────────────── */
+:root,
+[data-theme="light"] {
+  --bg:                     #ffffff;
+  --surface:                #f7f8fc;
+  --surface-2:              #eef0f9;
+  --surface-tint-progress:  #fef5e7;
+  --surface-tint-done:      #e8f6ee;
+
+  --border:                 #e8eaf2;
+  --border-2:               #d4d7e2;
+
+  --text:                   #131628;
+  --text-2:                 #4a5066;
+  --text-3:                 #7c8294;
+  --text-4:                 #b3b8c8;
+
+  --accent:                 #1d8fc7;
+  --accent-strong:          #156fa0;
+  --accent-tint:            #e0f0fa;
+  --accent-text:            #156fa0;
+  --accent-rgb:             29, 143, 199;
+
+  --in-progress:            #c47b1f;
+  --in-progress-tint:       #fdecc8;
+  --in-progress-border:     #f1d59c;
+
+  --done:                   #1f8a4f;
+  --done-tint:              #cdebd8;
+  --done-border:            #a4d8b8;
+
+  --reset:                  #b03838;
+  --reset-tint:             #f8dcdc;
+
+  --shadow-sm: 0 1px 2px rgba(20,24,40,0.04), 0 1px 3px rgba(20,24,40,0.04);
+  --shadow:    0 4px 12px rgba(20,24,40,0.06);
+  --shadow-lg: 0 12px 32px -8px rgba(20,24,40,0.18);
+}
+
+/* ── Dark ─────────────────────────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg:                     #0f1320;
+  --surface:                #181d2e;
+  --surface-2:              #1f2540;
+  --surface-tint-progress:  #2a2316;
+  --surface-tint-done:      #15281f;
+
+  --border:                 #252b41;
+  --border-2:               #34395a;
+
+  --text:                   #ebeef8;
+  --text-2:                 #a4abc4;
+  --text-3:                 #6b738f;
+  --text-4:                 #3e4564;
+
+  --accent:                 #5fb5e5;
+  --accent-strong:          #88cef0;
+  --accent-tint:            #1d3142;
+  --accent-text:            #88cef0;
+  --accent-rgb:             95, 181, 229;
+
+  --in-progress:            #f0b46a;
+  --in-progress-tint:       #3a2c10;
+  --in-progress-border:     #5a4220;
+
+  --done:                   #62c98a;
+  --done-tint:              #15301f;
+  --done-border:            #2c5a3a;
+
+  --reset:                  #e07878;
+  --reset-tint:             #3a1818;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --shadow:    0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg: 0 12px 32px -8px rgba(0,0,0,0.55);
+}
