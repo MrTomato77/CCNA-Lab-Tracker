@@ -292,7 +292,6 @@ window.quizPage = function() {
       this.sessionId    = null;
       this.currentQ     = null;
       this.finalSummary = null;
-      this.reviewSummary = null;
       this.summaryView  = 'wrong';
       this.selection    = [];
       this.feedback     = null;

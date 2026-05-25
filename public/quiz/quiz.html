@@ -160,7 +160,7 @@
   </template>
 
   <!-- SUMMARY -->
-  <template x-if="view==='summary' && finalSummary">
+  <div x-show="view==='summary' && 'finalSummary'">
     <div class="quiz-summary"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
@@ -290,12 +290,12 @@
         </div>
       </div>
     </div>
-  </template>
+  </div>
 
   <!-- REVIEW (past session) -->
-  <div x-show="view==='review' && reviewSummary">
+  <div x-show="view==='review' && 'reviewSummary'">
     <div class="quiz-summary"
-         x-show="view==='review' && reviewSummary"
+         x-show="view==='review' && 'reviewSummary'"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
          x-transition:enter-end="quiz-view-enter-end"
@@ -422,9 +422,6 @@
             <p class="empty-state">No correct answers.</p>
           </template>
         </div>
-      </div>
-
-      <div class="quiz-actions">
       </div>
     </div>
   </div>
