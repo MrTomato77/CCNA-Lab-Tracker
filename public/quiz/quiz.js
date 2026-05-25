@@ -277,28 +277,6 @@ window.quizPage = function() {
       this.feedback     = null;
       await this.loadDashboard();
     },
-
-    async resetProgress() {
-      const ok = await Alpine.store("modal").show(
-        "This will reset ALL quiz progress, sessions, and answer history. Question content is preserved.",
-        "Reset all quiz data", true,
-      );
-      if (!ok) return;
-      try {
-        const json = await api("/api/quiz/reset", { method: "POST" });
-        if (json.success) {
-          window.showToast(
-            `+ Cleared ${json.data.cleared_progress} progress, ${json.data.cleared_sessions} sessions, ${json.data.cleared_answers} answers`,
-            "success",
-          );
-          await this.loadDashboard();
-        } else {
-          window.showToast("× " + json.error, "error");
-        }
-      } catch (e) {
-        window.showToast("× Network error", "error");
-      }
-    },
   };
 };
 

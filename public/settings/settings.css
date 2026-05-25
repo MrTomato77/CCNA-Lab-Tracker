@@ -1,0 +1,119 @@
+/* Settings page: appearance section, danger zone, reset buttons. */
+
+/* ── Page header (shared with Import / Analytics) ─────────────────────────── */
+
+.page-header {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.page-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.page-subtitle {
+  font-size: 13px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+/* ── Section heads ────────────────────────────────────────────────────────── */
+
+.section-head {
+  position: relative;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 32px;
+  margin-bottom: 16px;
+}
+.section-head--danger {
+  color: var(--danger);
+}
+
+/* ── Setting rows ────────────────────────────────────────────────────────── */
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.setting-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.setting-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+.setting-desc {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+/* ── Danger zone ─────────────────────────────────────────────────────────── */
+
+.danger-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.danger-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius-card);
+}
+.danger-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.danger-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.danger-desc {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* ── Danger button variant ──────────────────────────────────────────────── */
+
+.btn-primary--danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #ffffff;
+}
+.btn-primary--danger:hover {
+  background: #c53030;
+  border-color: #c53030;
+}
+
+@media (max-width: 640px) {
+  .setting-row,
+  .danger-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .setting-row .btn-primary,
+  .danger-item .btn-primary {
+    width: 100%;
+  }
+}

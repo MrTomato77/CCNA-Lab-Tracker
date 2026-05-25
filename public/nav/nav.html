@@ -13,12 +13,10 @@
         <!-- Import tab hidden - no longer needed -->
         <!-- <button class="nav-tab" @click="page='import'"    :class="{active: page==='import'}">Import</button> -->
         <button class="nav-tab" @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
+        <button class="nav-tab" @click="page='settings'"  :class="{active: page==='settings'}">Settings</button>
       </div>
       <div class="nav-utility">
-        <button class="theme-toggle" @click="toggleTheme()"
-                :title="`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`"
-                x-text="theme === 'light' ? '☾' : '☀'"></button>
-        <button class="nav-reset" @click="resetAllLabs()">↻ Reset all</button>
+        <button class="nav-reset" @click="page='settings'">⚙</button>
       </div>
     </div>
   </nav>

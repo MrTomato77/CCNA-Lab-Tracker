@@ -1,0 +1,47 @@
+<!-- settings/settings.html — settings page partial (UI label: Settings).
+     Stitched into index.html by app.py _build_index() via an INCLUDE marker.
+     Do NOT add html/body wrappers; do NOT nest INCLUDE markers. -->
+<div class="page" x-show="page==='settings'" x-data="settingsPage()">
+  <header class="page-header">
+    <h1 class="page-title">Settings.</h1>
+    <p class="page-subtitle">Manage your tracker</p>
+  </header>
+
+  <div class="timeline">
+    <!-- Appearance Section -->
+    <h2 class="section-head">Appearance</h2>
+    <div class="section-body">
+      <div class="setting-row">
+        <div class="setting-label">
+          <span class="setting-name">Theme</span>
+          <span class="setting-desc">Choose light or dark mode</span>
+        </div>
+        <button class="btn-primary" @click="toggleTheme()">
+          <span x-text="theme === 'light' ? '☾ Switch to Dark' : '☀ Switch to Light'"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Danger Zone -->
+    <h2 class="section-head section-head--danger">Danger Zone</h2>
+    <div class="section-body">
+      <div class="danger-zone">
+        <div class="danger-item">
+          <div class="danger-info">
+            <span class="danger-title">Reset All Labs</span>
+            <span class="danger-desc">Reset all labs to Not Started and clear all timer data.</span>
+          </div>
+          <button class="btn-primary btn-primary--danger" @click="resetAllLabs()">Reset Labs</button>
+        </div>
+
+        <div class="danger-item">
+          <div class="danger-info">
+            <span class="danger-title">Reset All Quiz Data</span>
+            <span class="danger-desc">Clear quiz progress, sessions, and answer history. Question content is preserved.</span>
+          </div>
+          <button class="btn-primary btn-primary--danger" @click="resetQuizData()">Reset Quiz Data</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

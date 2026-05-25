@@ -1,4 +1,4 @@
-// window.appShell — root SPA component (theme toggle, nav routing, page state, /reset wrapper).
+// window.appShell — root SPA component (nav routing, page state, lab management).
 // Depends on core/main.js for Alpine stores + api() + showToast.
 
 // ── App Shell ─────────────────────────────────────────────────────────────
@@ -60,26 +60,6 @@ window.appShell = function() {
         console.error("Failed to load labs:", e);
       } finally {
         this.loading = false;
-      }
-    },
-
-    async resetAllLabs() {
-      const ok = await Alpine.store("modal").show(
-        "This will reset ALL labs to Not Started and clear all timer data.",
-        "Reset All Labs", true
-      );
-      if (!ok) return;
-      try {
-        const json = await api("/api/labs/reset", { method: "POST" });
-        if (json.success) {
-          await this.fetchLabs();
-          window.showToast("+ All labs have been reset successfully!", 'success');
-        } else {
-          window.showToast(`× Error: ${json.error}`, 'error');
-        }
-      } catch (e) {
-        window.showToast("× Network error while resetting labs", 'error');
-        console.error("Reset failed:", e);
       }
     },
 
