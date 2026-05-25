@@ -1,0 +1,235 @@
+<!-- QUIZ PAGE (v2) -->
+<div class="page" x-show="page==='quiz'" x-data="quizPage()" x-init="init()">
+
+
+  <!-- LOADING -->
+  <template x-if="view==='loading'">
+    <div class="loading"><span class="spinner"></span> Loading…</div>
+  </template>
+
+  <!-- LANDING -->
+  <template x-if="view==='landing' && dashboard">
+    <div class="quiz-landing"
+         x-transition:enter="quiz-view-enter"
+         x-transition:enter-start="quiz-view-enter-start"
+         x-transition:enter-end="quiz-view-enter-end">
+      <!-- Big mastery bar (hero style) -->
+      <header class="quiz-hero">
+        <div class="quiz-hero-left">
+          <div class="quiz-hero-stat">
+            <span x-text="String(dashboard.mastered_count).padStart(2,'0')"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="dashboard.quizable_total"></span>
+          </div>
+          <div class="quiz-hero-rule"></div>
+          <div class="quiz-hero-label">Mastered</div>
+        </div>
+        <div class="quiz-hero-right">
+          <div class="quiz-hero-percent" x-text="`${masteryPct()}% complete`"></div>
+          <div class="quiz-hero-sub">
+            out of <span x-text="dashboard.parsed_total"></span> parsed
+            (<span x-text="dashboard.flagged_count"></span> flagged)
+          </div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" :style="`width:${masteryPct()}%`"></div></div>
+      </header>
+
+
+
+      <!-- Batch picker -->
+      <div class="quiz-batch-grid">
+        <template x-for="size in BATCH_SIZES" :key="size.value">
+          <button class="quiz-batch-card"
+                  :disabled="!canStart(size.value)"
+                  @click="startSession(size.value)">
+            <div class="quiz-batch-num" x-text="size.label"></div>
+            <div class="quiz-batch-sub"
+                 x-text="canStart(size.value) ? 'questions' : `only ${candidateCount()} left`"></div>
+          </button>
+        </template>
+      </div>
+
+      <!-- Recent sessions -->
+      <hr class="section-divider">
+      <div class="quiz-history">
+        <template x-if="dashboard.recent_sessions.length === 0">
+          <p class="empty-state">No sessions yet.</p>
+        </template>
+        <template x-for="s in dashboard.recent_sessions" :key="s.id">
+          <div class="quiz-history-row">
+            <span class="quiz-history-score" x-text="`${s.total_correct}/${s.total_seen}`"></span>
+            <span class="quiz-history-pct"   x-text="`(${s.accuracy}%)`"></span>
+            <span class="quiz-history-meta"  x-text="`· ${formatDur(s.duration_sec)} · best ${s.best_streak} · ${ago(s.started_at)}`"></span>
+          </div>
+        </template>
+      </div>
+
+      <!-- Reset link -->
+      <button class="quiz-reset-link" @click="resetProgress()">↻ Reset all quiz data</button>
+    </div>
+  </template>
+
+  <!-- PRACTICE -->
+  <template x-if="view==='practice' && currentQ" :key="currentQ.question_id">
+    <div class="quiz-practice"
+         x-transition:enter="quiz-view-enter"
+         x-transition:enter-start="quiz-view-enter-start"
+         x-transition:enter-end="quiz-view-enter-end">
+      <header class="quiz-hero" style="margin-bottom: 24px;">
+        <div class="quiz-hero-left">
+          <div class="quiz-hero-stat">
+            <span x-text="String(currentQ.position.seen + 1).padStart(2,'0')"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="currentQ.position.total !== null ? currentQ.position.total : '∞'"></span>
+          </div>
+          <div class="quiz-hero-rule"></div>
+          <div class="quiz-hero-label">Question</div>
+        </div>
+        <div class="quiz-hero-right">
+          <div class="quiz-hero-percent" x-text="`⏱ ${elapsedFormatted}`"></div>
+          <button class="quiz-finish-link" @click="finishSession()" style="margin-top: 4px;">Finish session</button>
+        </div>
+        <div class="progress-track"><div class="progress-fill" :style="`width:${progressPct()}%`"></div></div>
+      </header>
+
+      <div class="quiz-question" x-data="{ showTh: false }" x-init="$watch('currentQ', () => showTh = false)">
+        <div class="quiz-prompt-row">
+          <div class="quiz-prompt-en" x-show="!showTh" x-text="currentQ.prompt_en"></div>
+          <div class="quiz-prompt-th" x-cloak x-show="showTh && currentQ.prompt_th" x-text="currentQ.prompt_th"></div>
+          <button class="btn-brief quiz-lang-toggle"
+                  x-show="currentQ.prompt_th"
+                  @click="showTh = !showTh"
+                  x-text="showTh ? 'EN' : 'TH'"></button>
+        </div>
+        <div class="quiz-q-meta">
+          <span x-text="`Q #${currentQ.question_id}`"></span>
+          <span x-show="currentQ.current_streak > 0"
+                x-text="`· streak ${currentQ.current_streak}`"></span>
+          <span class="quiz-q-status" x-show="feedback"
+                :class="feedback && feedback.is_correct ? 'quiz-q-status--correct' : 'quiz-q-status--wrong'"
+                x-text="feedback && feedback.is_correct ? `✓ answered in ${lastQSec}s · streak ${currentQ.current_streak + 1}` : `✗ answered in ${lastQSec}s`"></span>
+        </div>
+
+        <template x-if="currentQ.image_urls && currentQ.image_urls.length">
+          <div class="quiz-images">
+            <template x-for="url in currentQ.image_urls" :key="url">
+              <img class="quiz-image" :src="url" alt="" @click="$store.imageModal.show(url)">
+            </template>
+          </div>
+        </template>
+
+        <div class="quiz-choices">
+          <template x-for="choice in currentQ.choices" :key="choice.label">
+            <button class="quiz-choice"
+                    :class="{
+                      'quiz-choice--selected': isSelected(choice.label) && !feedback,
+                      'quiz-choice--correct':  feedback && isCorrectLabel(choice.label),
+                      'quiz-choice--wrong':    feedback && isSelected(choice.label) && !isCorrectLabel(choice.label)
+                    }"
+                    :disabled="feedback !== null"
+                    @click="toggleChoice(choice.label)">
+              <span class="quiz-choice-label" x-text="choice.label"></span>
+              <span class="quiz-choice-text"
+                    :class="{ 'quiz-choice-text--mono': isCiscoText(choice.text) }"
+                    x-text="choice.text"></span>
+            </button>
+          </template>
+        </div>
+
+        <!-- Feedback panel only when there's an explanation -->
+        <template x-if="feedback && feedback.explanation">
+          <div class="quiz-feedback"
+               :class="feedback.is_correct ? 'quiz-feedback--correct' : 'quiz-feedback--wrong'">
+            <p class="quiz-feedback-explanation"
+               x-show="feedback.explanation" x-text="feedback.explanation"></p>
+          </div>
+        </template>
+
+        <div class="quiz-actions">
+          <button class="btn-primary btn-primary--ghost" x-show="!feedback"
+                  :disabled="submitting"
+                  @click="iDontKnow()">I don't know</button>
+          <button class="btn-primary" x-show="!feedback"
+                  :disabled="selection.length === 0 || submitting"
+                  @click="submit()">Submit</button>
+          <button class="btn-primary" x-show="feedback" @click="fetchNext()">Next →</button>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- SUMMARY -->
+  <template x-if="view==='summary' && finalSummary">
+    <div class="quiz-summary"
+         x-transition:enter="quiz-view-enter"
+         x-transition:enter-start="quiz-view-enter-start"
+         x-transition:enter-end="quiz-view-enter-end">
+      <header class="quiz-hero" style="margin-bottom: 24px;">
+        <div class="quiz-hero-left">
+          <div class="quiz-hero-stat">
+            <span x-text="finalSummary.total_correct"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="finalSummary.total_seen"></span>
+          </div>
+          <div class="quiz-hero-rule"></div>
+          <div class="quiz-hero-label">Score</div>
+        </div>
+        <div class="quiz-hero-right">
+          <div class="quiz-hero-percent" x-text="`${finalSummary.accuracy}% accuracy`"></div>
+          <div class="quiz-hero-sub" x-text="`Duration: ${formatDur(finalSummary.duration_sec)}`"></div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" :style="`width:${finalSummary.accuracy}%`"></div></div>
+      </header>
+
+      <template x-if="finalSummary.wrong_answers && finalSummary.wrong_answers.length > 0">
+        <div>
+          <div class="quiz-wrong-list">
+            <template x-for="w in finalSummary.wrong_answers" :key="w.question_id">
+              <div class="quiz-wrong-item" x-data="{ open: false, showTh: false }">
+                <!-- div+role="button" because nested <button> would be invalid HTML
+                     (browser auto-moves the inner toggle out of the outer button,
+                     breaking Alpine's @click scope and the x-transition lifecycle). -->
+                <div class="quiz-wrong-summary"
+                     role="button"
+                     tabindex="0"
+                     :aria-expanded="open"
+                     @click="open = !open"
+                     @keydown.enter.prevent="open = !open"
+                     @keydown.space.prevent="open = !open">
+                  <span class="quiz-wrong-prompt"
+                        x-text="showTh && w.prompt_th ? w.prompt_th : w.prompt_en"></span>
+                  <button type="button"
+                          class="btn-brief quiz-lang-toggle"
+                          x-show="w.prompt_th"
+                          @click.stop="showTh = !showTh"
+                          x-text="showTh ? 'EN' : 'TH'"></button>
+                  <span class="quiz-wrong-chevron" :class="{ 'is-open': open }">›</span>
+                </div>
+                <!-- grid-rows trick: outer is display:grid with rows transitioning
+                     0fr ↔ 1fr; inner clips with overflow:hidden. Avoids Alpine's
+                     x-transition machinery which threw uncaught promise rejections
+                     on every toggle for our class names. -->
+                <div class="quiz-wrong-body-wrap" :class="{ 'is-open': open }">
+                  <div class="quiz-wrong-body">
+                    <ul class="quiz-wrong-choices">
+                      <template x-for="c in w.choices" :key="c.label">
+                        <li :class="{
+                              'wrong-choice--correct': w.correct_labels.includes(c.label),
+                              'wrong-choice--yours':   w.selected_labels.includes(c.label)
+                            }">
+                          <strong x-text="c.label"></strong>
+                          <span x-text="c.text"></span>
+                        </li>
+                      </template>
+                    </ul>
+                    <p class="quiz-feedback-explanation"
+                       x-show="w.explanation" x-text="w.explanation"></p>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+
+      <div class="quiz-actions">
+        <button class="btn-primary btn-primary--ghost" @click="backToLanding()">Back to landing</button>
+        <button class="btn-primary" @click="practiceAgain()">Practice again</button>
+      </div>
+    </div>
+  </template>
+</div>

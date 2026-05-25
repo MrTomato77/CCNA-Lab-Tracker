@@ -1,0 +1,455 @@
+/* quiz/quiz.css — Quiz v2 main + fix-ups + transitions consolidated
+   from three split sections in style.css (was ~415 lines total). */
+
+/* ── Quiz v2 ──────────────────────────────────────────────────────────── */
+
+.quiz-landing {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Quiz Hero */
+.quiz-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: flex-end;
+  padding: 16px 0 28px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.quiz-hero-left { display: flex; flex-direction: column; gap: 10px; }
+.quiz-hero-stat {
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  line-height: 1;
+}
+.quiz-hero-slash, .quiz-hero-total { color: var(--text-3); font-weight: 400; }
+.quiz-hero-rule {
+  width: 28px;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+.quiz-hero-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--text-3);
+}
+.quiz-hero-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.quiz-hero-percent {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text);
+}
+.quiz-hero-sub {
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* Stat pills */
+.quiz-stat-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.quiz-pill {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+.quiz-pill-value {
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-1);
+  margin-left: 4px;
+}
+
+.quiz-batch-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+.quiz-batch-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 22px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-1);
+}
+.quiz-batch-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.quiz-batch-card:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.quiz-batch-num {
+  font-size: 32px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--accent);
+}
+.quiz-batch-sub { font-size: 12px; color: var(--text-3); }
+
+.quiz-history {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.quiz-history-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.quiz-history-score { font-weight: 600; color: var(--text-1); }
+.quiz-history-pct   { color: var(--accent); }
+.quiz-history-meta  { color: var(--text-3); font-size: 13px; }
+
+.quiz-reset-link {
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--reset);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 8px;
+  opacity: 0.7;
+}
+.quiz-reset-link:hover { opacity: 1; text-decoration: underline; }
+
+/* Practice HUD */
+.quiz-practice { }
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;   /* + 28px flex gap on each side = ~40px breathing room */
+}
+
+/* ── Quiz v2 fix-ups ──────────────────────────────────────────────────── */
+
+.quiz-prompt-row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.quiz-lang-toggle {
+  padding: 2px 8px;
+  font-size: 11px;
+  margin-left: auto;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/* Per-question status sits at the rightmost of the q-meta row */
+.quiz-q-status {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: right;
+}
+.quiz-q-status--correct { color: var(--done); }
+.quiz-q-status--wrong   { color: var(--reset); }
+
+/* Pad the reset link off the recent-sessions list */
+.quiz-reset-link { margin-top: 16px; }
+
+.quiz-finish-link {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.quiz-finish-link:hover { color: var(--reset); }
+
+
+/* Question */
+.quiz-question {
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.quiz-prompt-en {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-1);
+  line-height: 1.5;
+  white-space: pre-line;
+}
+.quiz-prompt-th {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-1);
+  line-height: 1.5;
+  white-space: pre-line;
+}
+.quiz-q-meta {
+  display: flex;
+  font-size: 12px;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+.quiz-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+.quiz-image {
+  width: 100%;
+  max-height: 300px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  cursor: zoom-in;
+}
+
+
+/* Choices */
+.quiz-choices {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+/* Odd choice count → last cell spans the full row. Uses :nth-of-type
+   instead of :nth-child because Alpine's x-for keeps a hidden
+   <template> sibling that would otherwise offset the count by 1. */
+.quiz-choices > .quiz-choice:last-of-type:nth-of-type(odd) {
+  grid-column: span 2;
+}
+.quiz-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text-1);
+}
+.quiz-choice:hover:not(:disabled) { border-color: var(--accent); }
+.quiz-choice:disabled             { cursor: default; }
+.quiz-choice--selected            { border-color: var(--accent); background: var(--accent-tint); }
+.quiz-choice--correct             { border-color: var(--done);   background: var(--surface-tint-done); }
+.quiz-choice--wrong               { border-color: var(--reset);  background: rgba(176, 56, 56, 0.08); }
+.quiz-choice-label {
+  flex: 0 0 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  align-self: center;
+  color: var(--accent);
+}
+.quiz-choice--correct .quiz-choice-label { color: var(--done); }
+.quiz-choice--wrong   .quiz-choice-label { color: var(--reset); }
+.quiz-choice-text    {
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  align-self: center;
+  white-space: pre-line;
+}
+.quiz-choice-text--mono {
+  font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13px;
+}
+
+/* Feedback */
+.quiz-feedback {
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.quiz-feedback--correct { border-color: var(--done);  background: var(--surface-tint-done); }
+.quiz-feedback--wrong   { border-color: var(--reset); background: rgba(176, 56, 56, 0.06); }
+.quiz-feedback-explanation {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-2);
+  white-space: pre-line;
+}
+
+.quiz-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+/* Summary wrong-answer accordion */
+.quiz-summary {
+  margin: 0px auto 0;
+}
+.quiz-wrong-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.quiz-wrong-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.quiz-wrong-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.quiz-wrong-chevron {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 200ms var(--tx-easing-default);
+}
+.quiz-wrong-chevron.is-open { transform: rotate(90deg); }
+.quiz-wrong-prompt {
+  flex: 1;             /* pushes lang-toggle + chevron to the right */
+  font-weight: 400;
+  color: var(--text-2);
+  white-space: pre-line;
+}
+.quiz-wrong-body {
+  margin-top: 10px;
+  padding: 0 6px 4px;  /* horizontal inset so choices don't hit card edges */
+}
+.quiz-wrong-choices {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.quiz-wrong-choices li {
+  padding: 6px 10px;
+  border-radius: 4px;
+  display: flex;
+  gap: 8px;
+}
+.wrong-choice--correct {
+  background: var(--surface-tint-done);
+  color: var(--done);
+}
+.wrong-choice--yours {
+  outline: 1px dashed var(--reset);
+}
+
+@media (max-width: 720px) {
+  .quiz-batch-grid    { grid-template-columns: repeat(2, 1fr); }
+  .quiz-hero          { grid-template-columns: 1fr; }
+  .quiz-hero-right    { align-items: flex-start; }
+  .quiz-hero-stat     { font-size: 44px; }
+  .quiz-prompt-en     { font-size: 16px; }
+  .quiz-choice        { padding: 12px 14px; }
+  .quiz-actions       { flex-direction: column-reverse; }
+  .quiz-choices       { grid-template-columns: 1fr; }
+}
+
+/* ── Quiz v2 transitions & animations ────────────────────────────────── */
+
+/* View enter (landing / practice / summary) */
+.quiz-view-enter {
+  transition: opacity 200ms var(--tx-easing-default),
+              transform 200ms var(--tx-easing-default);
+}
+.quiz-view-enter-start { opacity: 0; transform: translateY(4px); }
+.quiz-view-enter-end   { opacity: 1; transform: none; }
+
+/* Question-advance slide-in (keyframe — fires on keyed remount of .quiz-question) */
+@keyframes qadv-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to   { opacity: 1; transform: none; }
+}
+.quiz-question {
+  animation: qadv-in 240ms var(--tx-easing-default);
+}
+
+/* Collapse animation for summary wrong-answer body.
+   Wrapper transitions max-height 0 → 1200px + opacity 0 → 1 when
+   .is-open is set by Alpine. Used a class-toggle pattern (not Alpine
+   x-transition) because Alpine's enter/leave class machinery threw
+   uncaught promise rejections on our class names. max-height ceiling
+   is generous; longest wrong-answer body in practice is well under
+   1000px (4–5 choices + explanation). */
+.quiz-wrong-body-wrap {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 220ms var(--tx-easing-default),
+              opacity 200ms var(--tx-easing-default);
+}
+.quiz-wrong-body-wrap.is-open {
+  max-height: 1200px;
+  opacity: 1;
+}
+
+/* Choice feedback flash */
+@keyframes quizCorrectFlash {
+  0%   { background: var(--surface); }
+  40%  { background: var(--done-tint); }
+  100% { background: var(--surface-tint-done); }
+}
+.quiz-choice--correct { animation: quizCorrectFlash 320ms ease-out both; }
+
+@keyframes quizWrongShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-3px); }
+  40%, 80% { transform: translateX(3px); }
+}
+.quiz-choice--wrong { animation: quizWrongShake 280ms ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .quiz-view-enter, .quiz-question,
+  .quiz-wrong-body-wrap, .quiz-wrong-chevron,
+  .quiz-choice--correct, .quiz-choice--wrong {
+    transition: none;
+    animation: none;
+  }
+}

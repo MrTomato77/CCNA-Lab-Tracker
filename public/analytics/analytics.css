@@ -2,6 +2,27 @@
    time chart container, category breakdown bars, plus analytics-owned
    responsive overrides. */
 
+/* ── Page header (Import / Analytics) ─────────────────────────────────── */
+
+.page-header {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+.page-title {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.page-subtitle {
+  font-size: 13px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+
 /* ── Analytics page ───────────────────────────────────────────────────── */
 
 .stats-grid {
