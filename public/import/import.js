@@ -1,6 +1,5 @@
-// import/import.js — window.importPage Alpine component.
-// Drag-and-drop file picker, folder discover, missing-labs panel.
-// Depends on core/main.js for api() and showToast.
+// window.importPage. Drag-drop, folder scan, missing-labs panel.
+// Depends on core/main.js (api, showToast).
 
 // ── Import Page ────────────────────────────────────────────────────────────
 window.importPage = function() {
@@ -26,8 +25,7 @@ window.importPage = function() {
     },
 
     async handleFileInput(e) {
-      // Mirror handleDrop's filter — accept attribute is browser hint only
-      // and users can bypass it via the "All Files" option in the OS dialog.
+      // Filter .pka files (accept attribute is browser hint only)
       const files = Array.from(e.target.files).filter(f => f.name.endsWith(".pka"));
       await this.uploadFiles(files);
     },

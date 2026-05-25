@@ -1,4 +1,4 @@
-/* Reset, body defaults, page wrapper, global hover-transition list. */
+/* Reset, body defaults, page wrapper, global transitions. */
 
 :root {
   --radius:        8px;
@@ -7,8 +7,7 @@
   --font-sans:    "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono:    "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
 
-  /* Transition system — mirrored in window.Transitions (core/main.js). JS follow-ups
-     (toasts, chart rerenders) read from there so values can't drift. */
+  /* Transition system — mirrored in window.Transitions (core/main.js) */
   --tx-duration-fast:    120ms;
   --tx-duration-normal:  200ms;
   --tx-duration-slow:    320ms;

@@ -1,9 +1,5 @@
-// analytics/analytics.js — window.statsPage component + chart theme sync.
-// UI label "Analytics" (internal state page==='stats').
-// statsPage: Chart.js rendering of slowest labs + category breakdown.
-// bindStatsThemeListener: one-time global listener that redraws the chart
-//   when the theme changes (registered lazily on first analytics view).
-// Depends on core/main.js for api(); Chart.js loaded synchronously from CDN.
+// window.statsPage + chart theme sync. UI: Analytics (internal: page==='stats').
+// Depends on core/main.js (api()); Chart.js from CDN.
 
 // ── Stats Page ─────────────────────────────────────────────────────────────
 window.statsPage = function() {
@@ -83,8 +79,7 @@ window.statsPage = function() {
 }
 
 // ── Stats theme-listener (one-time bind) ─────────────────────────────
-// Hoisted to module scope so repeated /stats navigation doesn't leak one
-// listener per visit (five visits = five redraws per theme toggle).
+// Hoisted to avoid leaking listeners on repeated navigation.
 let _statsRef = null;
 let _statsThemeBound = false;
 function bindStatsThemeListener(getCurrent) {

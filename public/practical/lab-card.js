@@ -1,8 +1,5 @@
-// practical/lab-card.js — window.labCard Alpine component.
-// Single lab-row state: timer ticking, launch/stop/done actions,
-// status pill, per-card reset, brief modal dispatch.
-// Depends on core/main.js for STATUS, TIMER_RESUME_CAP_SEC, formatTime(),
-// api(), Alpine stores (modal/summaryModal/app), showToast.
+// window.labCard. Timer, launch/stop/done, status pill, reset, brief modal.
+// Depends on core/main.js (STATUS, TIMER_RESUME_CAP_SEC, formatTime, api, stores, toast).
 
 // ── Lab Card ──────────────────────────────────────────────────────────────
 window.labCard = function(initialLab) {
@@ -14,8 +11,7 @@ window.labCard = function(initialLab) {
     interval: null,
 
     init() {
-      // Resume open timer if present. Cap guards against laptop-sleep / clock-drift
-      // / zombie sessions that slipped past startup cleanup.
+      // Resume open timer (capped at 8h to guard against sleep/clock-drift)
       if (!this.lab.open_session_started_at) return;
       const started = new Date(this.lab.open_session_started_at);
       const elapsed = Math.floor((Date.now() - started.getTime()) / 1000);
@@ -26,8 +22,7 @@ window.labCard = function(initialLab) {
       this.interval = setInterval(() => this.tickElapsed(), 1000);
     },
 
-    // Skipped while the card is hidden (offsetParent null) — avoids DOM
-    // updates for invisible timers; snaps to wall clock on next visible tick.
+    // Skip while hidden (offsetParent null) — snaps to wall clock on visible tick
     tickElapsed() {
       if (this.$el && this.$el.offsetParent === null) return;
       this.elapsed = Math.floor((Date.now() - this.sessionStart.getTime()) / 1000);
@@ -50,8 +45,7 @@ window.labCard = function(initialLab) {
       if (!this.running) return;
       clearInterval(this.interval);
       this.running = false;
-      // Wall clock (not tick counter) capped at 8h — matches init()'s zombie
-      // guard. Math.max guards against NTP corrections running backward.
+      // Wall clock (8h cap) — matches init() zombie guard. Math.max guards NTP backward.
       const wall = Math.floor((Date.now() - this.sessionStart.getTime()) / 1000);
       const duration = Math.max(0, Math.min(wall, TIMER_RESUME_CAP_SEC));
       try {
@@ -63,7 +57,7 @@ window.labCard = function(initialLab) {
           this.lab.time_spent = json.data.time_spent;
           this.lab.status = STATUS.DONE;
           await this.updateStatus(STATUS.DONE);
-          // Close PT — non-fatal if it fails; timer is already saved.
+          // Close PT (non-fatal if fails — timer is saved)
           try {
             const closeRes = await api(`/api/labs/${this.lab.id}/close`, { method: "POST" });
             if (!closeRes.success) {

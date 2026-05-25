@@ -1,9 +1,8 @@
-// Shared infrastructure: constants, Transitions FLIP orchestrator, api() fetch
-// wrapper, time formatter, Alpine stores (app/modal/summaryModal/imageModal),
-// toast service. Loads BEFORE every page component.
+// Shared: constants, Transitions FLIP, api(), formatTime, Alpine stores, toast.
+// Loads BEFORE all page components.
 
-// ── Shared constants ──────────────────────────────────────────────────────
-// Mirror of core/constants.py — sync manually when adding values backend-side.
+// ── Constants ──────────────────────────────────────────────────────
+// Sync with core/constants.py when adding backend values.
 const STATUS = Object.freeze({
   NOT_STARTED: 'not_started',
   IN_PROGRESS: 'in_progress',
@@ -20,39 +19,23 @@ const CATEGORIES = Object.freeze([
   'Management',      'Security & Advanced',
 ]);
 
-// 8h cap on resumed timers — see labCard.init() for rationale.
+// 8h cap on resumed timers (see labCard.init() for rationale).
 const TIMER_RESUME_CAP_SEC = 8 * 3600;
 
-// ── Transitions service ───────────────────────────────────────────────────
-// Single source of truth for animation timing and easings, mirrored in
-// CSS custom properties (:root in core/base.css). JS-driven follow-ups
-// (toasts, chart re-renders) should read from here so they can't drift
-// from the stylesheet.
+// ── Transitions (FLIP orchestrator) ───────────────────────────────────────────
+// Animation timing/easing source of truth. Mirrored in CSS :root.
+// JS follow-ups (toasts, charts) read from here to stay in sync.
 //
-// filterList() smooths list-filter transitions by combining two
-// techniques into one orchestrator:
-//
-//   • LEAVING cards (visible → hidden) are pinned to position:absolute
-//     at their old rect, dropping out of flow immediately so siblings
-//     don't reserve their slots during the fade-out.
-//   • REMAINING cards (visible → visible) get a FLIP animation: snapshot
-//     before, measure after, jump back to the old position via
-//     transform, then animate the transform to zero. The user sees a
-//     smooth slide from old slot to new slot rather than an instant
-//     "snap up" when the layout collapses.
-//   • ENTERING cards (hidden → visible) are left alone — Alpine's enter
-//     transition fades them in at their final slot, which is correct
-//     because leaving cards are already out of flow by then.
+// filterList() smooths list-filter transitions:
+//   • LEAVING cards: pinned to absolute at old rect, removed from flow
+//   • REMAINING cards: FLIP animation (snapshot → measure → jump back → animate)
+//   • ENTERING cards: handled by Alpine's enter transition
 //
 // Usage:
 //   const flip = Transitions.filterList('.cards-grid');
-//   // Inside a filter handler:
-//   flip.snapshot();         // capture positions before mutation
-//   this.filterCat = cat;    // trigger Alpine reactivity
+//   flip.snapshot();
+//   this.filterCat = cat;           // trigger reactivity
 //   this.$nextTick(() => flip.play());
-//
-// Reusable for any flex/grid list with x-show + fade transitions — pass
-// the container selector, optionally override duration/easing/leaveClass.
 const Transitions = Object.freeze({
   DURATION: Object.freeze({ fast: 120, normal: 200, slow: 320 }),  // ms
   EASING: Object.freeze({
@@ -88,9 +71,7 @@ const Transitions = Object.freeze({
       },
 
       play() {
-        // Pass 1 — pin leaving cards to absolute at their snapshotted
-        // position, taking them out of flow so layout settles to its
-        // final form before we measure remaining cards.
+        // Pass 1: pin leaving cards to absolute at old rect (removes from flow)
         for (const [el, { rect: oldRect, container }] of oldPositions) {
           if (!el.classList.contains(leaveClass)) continue;
           const cRect = container.getBoundingClientRect();
@@ -109,10 +90,7 @@ const Transitions = Object.freeze({
           el.addEventListener('transitionend', onLeaveEnd);
         }
 
-        // Pass 2 — FLIP remaining cards. Layout is now collapsed (leaving
-        // cards are absolute), so getBoundingClientRect returns the FINAL
-        // positions. We jump back to old positions via transform, then
-        // animate the transform to zero on the next frame.
+        // Pass 2: FLIP remaining cards (layout collapsed, get final positions)
         for (const [el, { rect: oldRect }] of oldPositions) {
           if (el.classList.contains(leaveClass)) continue;
           if (getComputedStyle(el).display === 'none') continue;
@@ -123,8 +101,7 @@ const Transitions = Object.freeze({
 
           el.style.transition = 'none';
           el.style.transform  = `translate(${dx}px, ${dy}px)`;
-          // Force the inverted state to apply before unwinding it.
-          void el.offsetWidth;
+          void el.offsetWidth;  // force inverted state
           requestAnimationFrame(() => {
             el.style.transition = `transform ${duration}ms ${easing}`;
             el.style.transform  = '';
@@ -144,13 +121,9 @@ const Transitions = Object.freeze({
 window.Transitions = Transitions;
 
 // ── Fetch wrapper ─────────────────────────────────────────────────────────
-// Returns the parsed JSON envelope when the server speaks JSON, regardless
-// of HTTP status — the backend always wraps errors as {success:false,...}.
-// If the response isn't JSON (e.g. a router crash returning HTML 500) the
-// wrapper synthesizes a {success:false} envelope so callers don't blow up
-// on res.json() and can fall through to a generic error toast. The HTTP
-// status is bubbled up via .status so callers that care (e.g. quiz's 409
-// ALREADY_ANSWERED auto-advance) can branch on it.
+// Returns parsed JSON envelope regardless of HTTP status.
+// Backend wraps errors as {success:false,...}. Non-JSON responses (e.g. HTML 500)
+// are synthesized into {success:false} envelopes. HTTP status bubbled via .status.
 async function api(path, { method = 'GET', body = null } = {}) {
   const opts = { method };
   if (body !== null) {

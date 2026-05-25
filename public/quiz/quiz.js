@@ -1,8 +1,6 @@
-// Quiz page (UI label) — internal state page==='quiz'.
-// quizPage: Quiz v2 main component (landing + practice + summary views).
-// isCiscoText: Heuristic detector for Cisco CLI/config text (quiz-only helper).
+// Quiz page (internal state: page==='quiz'). Quiz v2 component + isCiscoText helper.
 
-// ── Quiz Page (v2) ─────────────────────────────────────────────────────────
+// ── Quiz Page ─────────────────────────────────────────────────────────
 window.quizPage = function() {
   const BATCH_SIZES = [
     { value: 25,        label: "25"  },
@@ -14,7 +12,7 @@ window.quizPage = function() {
 
   return {
     BATCH_SIZES,
-    view: "loading",          // "loading" | "landing" | "practice" | "summary"
+    view: "loading",          // loading | landing | practice | summary
     dashboard: null,
     sessionId: null,
     pickedN: null,
@@ -23,8 +21,8 @@ window.quizPage = function() {
     feedback: null,
     submitting: false,
     finalSummary: null,
-    startedAt: 0,             // ms — session timer
-    elapsed: 0,               // ms — re-rendered every second
+    startedAt: 0,             // ms
+    elapsed: 0,               // ms
     elapsedFormatted: "00:00",
     _timerId: null,
     _qStartedAt: 0,
@@ -87,7 +85,7 @@ window.quizPage = function() {
     progressPct() {
       if (!this.currentQ) return 0;
       const p = this.currentQ.position;
-      if (p.total === null) return 0; // ∞ — no progress bar fill
+      if (p.total === null) return 0; // ∞ mode
       return Math.round(((p.seen + 1) / p.total) * 100);
     },
     formatDur(sec) {
@@ -165,8 +163,7 @@ window.quizPage = function() {
         this._qStartedAt = Date.now();
         this.view = "practice";
       } catch (e) {
-        // Network drop with the timer still ticking would burn battery and
-        // run a phantom session clock until the next nav — stop it here.
+        // Stop timer on network error to avoid phantom clock
         window.showToast("× Network error", "error");
         this._stopTimer();
         this.view = "landing";
@@ -199,8 +196,7 @@ window.quizPage = function() {
                   selected_labels: this.selection },
         });
         if (!json.success) {
-          // ALREADY_ANSWERED means a previous click already landed; advance
-          // instead of trapping the user on a dead question.
+          // ALREADY_ANSWERED: advance instead of trapping user
           if (json.code === "ALREADY_ANSWERED") {
             await this.fetchNext();
             return;
@@ -263,10 +259,7 @@ window.quizPage = function() {
     },
 
     async practiceAgain() {
-      // Prefer the finished session we just summarized, then fall back to
-      // the dashboard's latest. batch_size IS NULL in the DB means the
-      // session was ENDLESS — preserve that intent instead of silently
-      // shrinking the user down to a 25-card batch.
+      // Preserve ENDLESS intent (batch_size IS NULL in DB)
       const prior = this.finalSummary ?? this.dashboard?.latest_session;
       const lastBatch = prior?.batch_size;
       const replay = lastBatch == null ? "ENDLESS" : lastBatch;
@@ -310,9 +303,7 @@ window.quizPage = function() {
 };
 
 // ── Cisco-text detector ───────────────────────────────────────────────
-// Heuristic: text is Cisco CLI / config if it matches any common prompt or
-// configuration directive. Used by the practice view to render config-style
-// choices in monospace so the columns and punctuation actually read.
+// Heuristic: matches common Cisco CLI/config patterns for monospace rendering.
 const CISCO_RE = /Switch\(config|Router\(config|R\d+\(config|\binterface\s+\w|\bswitchport\s|\bspanning-tree\s|\bip\s+route\s|\bip\s+address\s|^\s*conf\s+t\b|^\s*en\b/im;
 function isCiscoText(text) {
   return typeof text === "string" && CISCO_RE.test(text);
