@@ -61,14 +61,8 @@
         <!-- Cards -->
         <div class="cards-grid-stack">
         <template x-for="p in panels" :key="p.id">
-          <div class="cards-grid"
-               x-show="p.visible"
-               x-transition:enter="panel-fade-enter"
-               x-transition:enter-start="panel-fade-enter-start"
-               x-transition:enter-end="panel-fade-enter-end"
-               x-transition:leave="panel-fade-leave"
-               x-transition:leave-start="panel-fade-leave-start"
-               x-transition:leave-end="panel-fade-leave-end">
+          <div class="cards-grid view-panel"
+               :class="p.visible ? 'view-active' : 'view-hidden'">
           <template x-for="lab in labs.filter(l => (!p.fc || l.category === p.fc) && (p.hs !== 'done' || l.status !== 'done') && (p.hs !== 'undone' || l.status === 'done'))" :key="lab.id">
             <article x-data="labCard(lab)" x-init="init()" :class="cardClass()">
               <!-- Col 1: identity -->
