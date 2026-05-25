@@ -13,13 +13,31 @@ window.appShell = function() {
     theme: document.documentElement.getAttribute("data-theme") || "light",
     categories: CATEGORIES,
 
+    // Stacked card-grid panels for the filter swap transition. The most
+    // recently pushed panel is the visible one; previous panels are kept
+    // briefly so their leave transition can run, then garbage-collected.
+    panels: [{ id: 0, fc: "", hs: "", visible: true }],
+    _panelCounter: 0,
+
     get summary() { return this.$store.app.summary; },
 
-    // Composite key — changes whenever any filter input changes, which
-    // remounts the keyed .cards-grid wrapper and triggers the panel fade.
-    get filterKey() { return `${this.filterCat}|${this.hideStatus}`; },
-
-    setFilter(updater) { updater(); },
+    setFilter(updater) {
+      updater();
+      this.panels.forEach(p => p.visible = false);
+      const next = {
+        id: ++this._panelCounter,
+        fc: this.filterCat,
+        hs: this.hideStatus,
+        visible: false,
+      };
+      this.panels.push(next);
+      this.$nextTick(() => {
+        next.visible = true;
+        setTimeout(() => {
+          this.panels = this.panels.filter(p => p.visible);
+        }, 300);
+      });
+    },
 
     async init() {
       await this.fetchLabs();
