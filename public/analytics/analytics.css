@@ -19,6 +19,7 @@
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
+  transition: all 160ms ease;
 }
 .stat-card:hover { border-color: var(--border-2); }
 
