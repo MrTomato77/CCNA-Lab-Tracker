@@ -362,13 +362,13 @@
 .quiz-exit-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-3);
+  font-size: 13px;
   cursor: pointer;
   transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
 }
