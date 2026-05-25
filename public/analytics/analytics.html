@@ -9,106 +9,100 @@
     </header>
 
     <div x-show="loading" class="loading"><span class="spinner"></span> Loading…</div>
-    <template x-if="!loading">
-      <div class="timeline">
-        <!-- Toggle Switch -->
-        <div class="analytics-toggle">
-          <button class="analytics-toggle-btn" :class="{active: analyticsView==='practical'}" @click="analyticsView='practical'">Practical</button>
-          <button class="analytics-toggle-btn" :class="{active: analyticsView==='quiz'}" @click="analyticsView='quiz'">Quiz</button>
+    <div x-show="!loading" class="timeline">
+      <!-- Toggle Switch -->
+      <div class="analytics-toggle">
+        <button class="analytics-toggle-btn" :class="{active: analyticsView==='practical'}" @click="analyticsView='practical'">Practical</button>
+        <button class="analytics-toggle-btn" :class="{active: analyticsView==='quiz'}" @click="analyticsView='quiz'">Quiz</button>
+      </div>
+
+      <!-- Practical Section -->
+      <div x-show="analyticsView==='practical'">
+        <h2 class="analytics-section-title">Practical</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-num" x-text="summary.done"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Done</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="summary.in_progress"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">In Progress</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="summary.not_started"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Not Started</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num stat-num--time" x-html="formatTimeRich(summary.total_time_spent)"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Total Time</div>
+          </div>
         </div>
 
-        <!-- Practical Section -->
-        <template x-if="analyticsView==='practical'">
-          <div>
-            <h2 class="analytics-section-title">Practical</h2>
-            <div class="stats-grid">
-              <div class="stat-card">
-                <div class="stat-num" x-text="summary.done"></div>
-                <div class="stat-rule"></div>
-                <div class="stat-label">Done</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-num" x-text="summary.in_progress"></div>
-                <div class="stat-rule"></div>
-                <div class="stat-label">In Progress</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-num" x-text="summary.not_started"></div>
-                <div class="stat-rule"></div>
-                <div class="stat-label">Not Started</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-num stat-num--time" x-html="formatTimeRich(summary.total_time_spent)"></div>
-                <div class="stat-rule"></div>
-                <div class="stat-label">Total Time</div>
-              </div>
-            </div>
+        <h3 class="section-head">Time per Lab — slowest first</h3>
+        <div class="section-body">
+          <canvas id="timeChart" height="80"></canvas>
+        </div>
 
-            <h3 class="section-head">Time per Lab — slowest first</h3>
-            <div class="section-body">
-              <canvas id="timeChart" height="80"></canvas>
-            </div>
-
-            <h3 class="section-head">Progress by Category</h3>
-            <div class="section-body">
-              <div class="category-bars">
-                <template x-for="cat in byCategory" :key="cat.category">
-                  <div class="cat-row">
-                    <span class="cat-name" x-text="cat.category"></span>
-                    <div class="cat-track">
-                      <div class="cat-fill" :style="`width:${cat.total>0?(cat.done/cat.total)*100:0}%`"></div>
-                    </div>
-                    <span class="cat-count" x-text="`${cat.done} / ${cat.total}`"></span>
-                  </div>
-                </template>
+        <h3 class="section-head">Progress by Category</h3>
+        <div class="section-body">
+          <div class="category-bars">
+            <template x-for="cat in byCategory" :key="cat.category">
+              <div class="cat-row">
+                <span class="cat-name" x-text="cat.category"></span>
+                <div class="cat-track">
+                  <div class="cat-fill" :style="`width:${cat.total>0?(cat.done/cat.total)*100:0}%`"></div>
+                </div>
+                <span class="cat-count" x-text="`${cat.done} / ${cat.total}`"></span>
               </div>
-            </div>
+            </template>
           </div>
-        </template>
-
-        <!-- Quiz Section -->
-        <template x-if="analyticsView==='quiz'">
-          <div>
-            <h2 class="analytics-section-title analytics-section-title--quiz">Quiz</h2>
-            <div class="stats-grid">
-              <div class="stat-card">
-                <div class="stat-num" x-text="quizSummary.mastered_count"></div>
-                <div class="stat-rule"></div>
-                <div class="stat-label">Mastered</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-num" x-text="quizSummary.quizable_total"></div>
-                <div class="stat-rule"></div>
-                <div class="stat-label">Quizable</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-num" x-text="quizSummary.avg_accuracy"></div>
-                <div class="stat-rule"></div>
-                <div class="stat-label">Avg Accuracy</div>
-              </div>
-              <div class="stat-card">
-                <div class="stat-num" x-text="quizSummary.total_sessions"></div>
-                <div class="stat-rule"></div>
-                <div class="stat-label">Sessions</div>
-              </div>
-            </div>
-
-            <h3 class="section-head">Accuracy Trend (last 10 sessions)</h3>
-            <div class="section-body">
-              <template x-if="quizLoaded">
-                <canvas id="accuracyChart" height="80"></canvas>
-              </template>
-              <template x-if="!quizLoaded">
-                <p class="empty-state">Quiz data not available.</p>
-              </template>
-            </div>
-
-            <div class="quiz-streak">
-              <span class="quiz-streak-label">Best Streak Ever:</span>
-              <span class="quiz-streak-value" x-text="quizSummary.best_streak_ever"></span>
-            </div>
-          </div>
-        </template>
+        </div>
       </div>
-    </template>
+
+      <!-- Quiz Section -->
+      <div x-show="analyticsView==='quiz'">
+        <h2 class="analytics-section-title analytics-section-title--quiz">Quiz</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-num" x-text="quizSummary.mastered_count"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Mastered</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="quizSummary.quizable_total"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Quizable</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="quizSummary.avg_accuracy"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Avg Accuracy</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="quizSummary.total_sessions"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Sessions</div>
+          </div>
+        </div>
+
+        <h3 class="section-head">Accuracy Trend (last 10 sessions)</h3>
+        <div class="section-body">
+          <template x-if="quizLoaded">
+            <canvas id="accuracyChart" height="80"></canvas>
+          </template>
+          <template x-if="!quizLoaded">
+            <p class="empty-state">Quiz data not available.</p>
+          </template>
+        </div>
+
+        <div class="quiz-streak">
+          <span class="quiz-streak-label">Best Streak Ever:</span>
+          <span class="quiz-streak-value" x-text="quizSummary.best_streak_ever"></span>
+        </div>
+      </div>
+    </div>
   </div>

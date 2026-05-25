@@ -16,7 +16,7 @@
           <span class="setting-name">Theme</span>
           <span class="setting-desc">Choose light or dark mode</span>
         </div>
-        <button class="btn-primary" @click="toggleTheme()">
+        <button class="btn-primary btn-primary--ghost" @click="toggleTheme()">
           <span x-text="theme === 'light' ? '☾ Switch to Dark' : '☀ Switch to Light'"></span>
         </button>
       </div>
@@ -39,7 +39,7 @@
             <span class="danger-title">Reset All Quiz Data</span>
             <span class="danger-desc">Clear quiz progress, sessions, and answer history. Question content is preserved.</span>
           </div>
-          <button class="btn-primary btn-primary--danger" @click="resetQuizData()">Reset Quiz Data</button>
+          <button class="btn-primary btn-primary--danger" @click="resetQuizData()">Reset quiz</button>
         </div>
       </div>
     </div>

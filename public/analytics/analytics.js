@@ -54,8 +54,14 @@ window.statsPage = function() {
       this.loading = false;
       await this.$nextTick();
       if (this._slowest) this.renderChart(this._slowest);
-      if (this.quizLoaded && this._accuracyTrend) this.renderAccuracyChart(this._accuracyTrend);
+      if (this.quizLoaded && this._accuracyTrend && this.analyticsView === 'quiz') this.renderAccuracyChart(this._accuracyTrend);
       bindStatsThemeListener(() => this);
+    },
+
+    $watch('analyticsView', value) {
+      if (value === 'quiz' && this.quizLoaded && this._accuracyTrend) {
+        this.$nextTick(() => this.renderAccuracyChart(this._accuracyTrend));
+      }
     },
 
     renderChart(data) {
