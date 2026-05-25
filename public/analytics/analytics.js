@@ -58,10 +58,12 @@ window.statsPage = function() {
       bindStatsThemeListener(() => this);
     },
 
-    $watch('analyticsView', value) {
-      if (value === 'quiz' && this.quizLoaded && this._accuracyTrend) {
-        this.$nextTick(() => this.renderAccuracyChart(this._accuracyTrend));
-      }
+    init() {
+      this.$watch('analyticsView', (value) => {
+        if (value === 'quiz' && this.quizLoaded && this._accuracyTrend) {
+          this.$nextTick(() => this.renderAccuracyChart(this._accuracyTrend));
+        }
+      });
     },
 
     renderChart(data) {
