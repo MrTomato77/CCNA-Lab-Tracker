@@ -166,11 +166,34 @@
 
 /* ── Cards grid ───────────────────────────────────────────────────────── */
 
+/* Stack the keyed cards-grid instances so the leaving filter result and the
+   entering one overlap in the same cell during the fade. */
+.cards-grid-stack {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+.cards-grid-stack > .cards-grid {
+  grid-area: 1 / 1;
+}
+
 .cards-grid {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  position: relative;  /* anchor for absolute-positioned leaving cards */
+}
+
+/* Panel fade — mirrors the quiz summary Wrong/Correct toggle transition. */
+.panel-fade-enter,
+.panel-fade-leave {
+  transition: opacity 250ms ease, transform 250ms ease;
+}
+.panel-fade-enter-start { opacity: 0; transform: translateY(12px); }
+.panel-fade-enter-end   { opacity: 1; transform: none; }
+.panel-fade-leave-start { opacity: 1; transform: none; }
+.panel-fade-leave-end   { opacity: 0; transform: translateY(12px); }
+@media (prefers-reduced-motion: reduce) {
+  .panel-fade-enter,
+  .panel-fade-leave { transition: none; }
 }
 
 /* ── Responsive (practical-owned overrides) ───────────────────────────── */

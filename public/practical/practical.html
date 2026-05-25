@@ -59,16 +59,18 @@
         </div>
 
         <!-- Cards -->
-        <div class="cards-grid">
-          <template x-for="(lab, idx) in labs" :key="lab.id">
-            <article x-data="labCard(lab)" x-init="init()" :class="cardClass()"
-              x-show="matchesFilter(lab)"
-              x-transition:enter="card-fade-enter"
-              x-transition:enter-start="card-fade-enter-from"
-              x-transition:enter-end="card-fade-enter-to"
-              x-transition:leave="card-fade-leave"
-              x-transition:leave-start="card-fade-leave-from"
-              x-transition:leave-end="card-fade-leave-to">
+        <div class="cards-grid-stack">
+        <template x-for="key in [filterKey]" :key="key">
+          <div class="cards-grid"
+               x-data="{ fc: filterCat, hs: hideStatus }"
+               x-transition:enter="panel-fade-enter"
+               x-transition:enter-start="panel-fade-enter-start"
+               x-transition:enter-end="panel-fade-enter-end"
+               x-transition:leave="panel-fade-leave"
+               x-transition:leave-start="panel-fade-leave-start"
+               x-transition:leave-end="panel-fade-leave-end">
+          <template x-for="lab in labs.filter(l => (!fc || l.category === fc) && (hs !== 'done' || l.status !== 'done') && (hs !== 'undone' || l.status === 'done'))" :key="lab.id">
+            <article x-data="labCard(lab)" x-init="init()" :class="cardClass()">
               <!-- Col 1: identity -->
               <div class="lab-identity">
                 <div class="lab-badge" x-text="String(lab.id.replace('LAB-','')).padStart(2,'0')"></div>
@@ -126,6 +128,8 @@
               </div>
             </article>
           </template>
+          </div>
+        </template>
         </div>
       </div>
     </template>

@@ -12,16 +12,14 @@ window.appShell = function() {
     statusOpen: false,
     theme: document.documentElement.getAttribute("data-theme") || "light",
     categories: CATEGORIES,
-    _flip: null,  // created lazily in init() after .cards-grid exists
 
     get summary() { return this.$store.app.summary; },
 
-    setFilter(updater) {
-      if (!this._flip) this._flip = Transitions.filterList('.cards-grid');
-      this._flip.snapshot();
-      updater();
-      this.$nextTick(() => this._flip.play());
-    },
+    // Composite key — changes whenever any filter input changes, which
+    // remounts the keyed .cards-grid wrapper and triggers the panel fade.
+    get filterKey() { return `${this.filterCat}|${this.hideStatus}`; },
+
+    setFilter(updater) { updater(); },
 
     async init() {
       await this.fetchLabs();
