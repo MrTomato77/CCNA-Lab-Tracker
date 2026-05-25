@@ -444,7 +444,7 @@
 }
 .quiz-answer-body {
   margin-top: 10px;
-  padding: 0 6px 4px;
+  padding: 0 6px;
 }
 .quiz-answer-choices {
   list-style: none;
@@ -452,7 +452,6 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 8px;
 }
 .quiz-answer-choices li {
   padding: 6px 10px;

@@ -293,8 +293,8 @@
   </template>
 
   <!-- REVIEW (past session) -->
-  <template x-if="view==='review' && reviewSummary">
     <div class="quiz-summary"
+         x-show="view==='review' && reviewSummary"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
          x-transition:enter-end="quiz-view-enter-end"
