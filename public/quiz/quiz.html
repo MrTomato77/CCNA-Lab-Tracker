@@ -8,14 +8,14 @@
   </div>
 
   <!-- LANDING -->
-  <div x-show="view==='landing' && dashboard">
-    <div class="quiz-landing"
-         x-transition:enter="quiz-view-enter"
-         x-transition:enter-start="quiz-view-enter-start"
-         x-transition:enter-end="quiz-view-enter-end"
-         x-transition:leave="quiz-view-leave"
-         x-transition:leave-start="quiz-view-leave-start"
-         x-transition:leave-end="quiz-view-leave-end">
+  <div class="quiz-landing"
+       x-show="view==='landing' && dashboard"
+       x-transition:enter="quiz-view-enter"
+       x-transition:enter-start="quiz-view-enter-start"
+       x-transition:enter-end="quiz-view-enter-end"
+       x-transition:leave="quiz-view-leave"
+       x-transition:leave-start="quiz-view-leave-start"
+       x-transition:leave-end="quiz-view-leave-end">
       <!-- Big mastery bar (hero style) -->
       <header class="quiz-hero">
         <div class="quiz-hero-left">
@@ -66,18 +66,17 @@
         </template>
       </div>
 
-    </div>
   </div>
 
   <!-- PRACTICE -->
-  <div x-show="view==='practice' && currentQ">
-    <div class="quiz-practice"
-         x-transition:enter="quiz-view-enter"
-         x-transition:enter-start="quiz-view-enter-start"
-         x-transition:enter-end="quiz-view-enter-end"
-         x-transition:leave="quiz-view-leave"
-         x-transition:leave-start="quiz-view-leave-start"
-         x-transition:leave-end="quiz-view-leave-end">
+  <div class="quiz-practice"
+       x-show="view==='practice' && currentQ"
+       x-transition:enter="quiz-view-enter"
+       x-transition:enter-start="quiz-view-enter-start"
+       x-transition:enter-end="quiz-view-enter-end"
+       x-transition:leave="quiz-view-leave"
+       x-transition:leave-start="quiz-view-leave-start"
+       x-transition:leave-end="quiz-view-leave-end">
       <header class="quiz-hero" style="margin-bottom: 24px;">
         <div class="quiz-hero-left">
           <div class="quiz-hero-stat">
@@ -157,17 +156,16 @@
         </div>
       </div>
     </div>
-  </div>
 
   <!-- SUMMARY -->
-  <div x-show="view==='summary' && finalSummary">
-    <div class="quiz-summary"
-         x-transition:enter="quiz-view-enter"
-         x-transition:enter-start="quiz-view-enter-start"
-         x-transition:enter-end="quiz-view-enter-end"
-         x-transition:leave="quiz-view-leave"
-         x-transition:leave-start="quiz-view-leave-start"
-         x-transition:leave-end="quiz-view-leave-end">
+  <div class="quiz-summary"
+       x-show="view==='summary' && finalSummary"
+       x-transition:enter="quiz-view-enter"
+       x-transition:enter-start="quiz-view-enter-start"
+       x-transition:enter-end="quiz-view-enter-end"
+       x-transition:leave="quiz-view-leave"
+       x-transition:leave-start="quiz-view-leave-start"
+       x-transition:leave-end="quiz-view-leave-end">
       <header class="quiz-hero" style="margin-bottom: 24px;">
         <div class="quiz-hero-left">
           <div class="quiz-hero-stat">
@@ -290,17 +288,16 @@
         </div>
       </div>
     </div>
-  </div>
 
   <!-- REVIEW (past session) -->
-  <div x-show="view==='review' && reviewSummary">
-    <div class="quiz-summary"
-         x-transition:enter="quiz-view-enter"
-         x-transition:enter-start="quiz-view-enter-start"
-         x-transition:enter-end="quiz-view-enter-end"
-         x-transition:leave="quiz-view-leave"
-         x-transition:leave-start="quiz-view-leave-start"
-         x-transition:leave-end="quiz-view-leave-end">
+  <div class="quiz-summary"
+       x-show="view==='review' && reviewSummary"
+       x-transition:enter="quiz-view-enter"
+       x-transition:enter-start="quiz-view-enter-start"
+       x-transition:enter-end="quiz-view-enter-end"
+       x-transition:leave="quiz-view-leave"
+       x-transition:leave-start="quiz-view-leave-start"
+       x-transition:leave-end="quiz-view-leave-end">
       <header class="quiz-hero" style="margin-bottom: 24px;">
         <div class="quiz-hero-left">
           <div class="quiz-hero-stat">
@@ -422,6 +419,5 @@
           </template>
         </div>
       </div>
-    </div>
   </div>
 </div>
