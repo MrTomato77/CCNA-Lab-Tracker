@@ -1,11 +1,33 @@
 /* Analytics page: stats grid, stat cards, time chart, category bars, quiz stats. */
 
-/* ── Page header (shared with Import / Settings) ─────────────────────────── */
+/* ── View panel transitions ─────────────────────────────────────────────── */
+.view-panel {
+  transition: opacity 250ms ease, transform 250ms ease;
+}
+.view-active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.view-hidden {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+}
+
+.timeline {
+  position: relative;
+}
 
 .page-header {
   margin-bottom: 32px;
   padding-bottom: 24px;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 .page-title {
   font-size: 32px;
@@ -29,7 +51,6 @@
   border-radius: var(--radius-pill);
   padding: 3px;
   gap: 2px;
-  margin-bottom: 24px;
 }
 .analytics-toggle-btn {
   padding: 6px 20px;
@@ -101,20 +122,6 @@
 }
 
 #timeChart { margin: 8px 0; }
-
-/* ── Section titles ───────────────────────────────────────────────────────── */
-
-.analytics-section-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text);
-  margin-top: 32px;
-  margin-bottom: 16px;
-}
-.analytics-section-title--quiz {
-  margin-top: 48px;
-  color: var(--accent);
-}
 
 /* ── Quiz streak display ───────────────────────────────────────────────── */
 
