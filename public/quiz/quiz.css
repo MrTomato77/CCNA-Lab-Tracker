@@ -146,7 +146,6 @@
 .quiz-reset-link:hover { opacity: 1; text-decoration: underline; }
 
 /* Practice HUD */
-.quiz-practice { }
 .section-divider {
   border: none;
   border-top: 1px solid var(--border);
