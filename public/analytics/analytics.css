@@ -1,6 +1,6 @@
-/* Analytics page: stats grid, stat cards, time chart, category bars. */
+/* Analytics page: stats grid, stat cards, time chart, category bars, quiz stats. */
 
-/* ── Page header (Import / Analytics) ─────────────────────────────────── */
+/* ── Page header (shared with Import / Settings) ─────────────────────────── */
 
 .page-header {
   margin-bottom: 32px;
@@ -72,6 +72,47 @@
 }
 
 #timeChart { margin: 8px 0; }
+
+/* ── Section titles ───────────────────────────────────────────────────────── */
+
+.analytics-section-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 32px;
+  margin-bottom: 16px;
+}
+.analytics-section-title--quiz {
+  margin-top: 48px;
+  color: var(--accent);
+}
+
+/* ── Quiz streak display ───────────────────────────────────────────────── */
+
+.quiz-streak {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.quiz-streak-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.quiz-streak-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* ── Accuracy chart ───────────────────────────────────────────────────────── */
+
+#accuracyChart { margin: 8px 0; }
 
 .category-bars {
   display: flex;

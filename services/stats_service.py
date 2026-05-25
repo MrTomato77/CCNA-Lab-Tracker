@@ -52,3 +52,63 @@ async def slowest(limit: int = 5) -> list[dict]:
         LIMIT ?
     """, (limit,)) as cur:
         return [dict(r) for r in await cur.fetchall()]
+
+
+# ── Quiz stats ─────────────────────────────────────────────────────────────
+
+async def quiz_summary() -> dict:
+    """Quiz aggregate stats: mastered, quizable, total sessions, avg accuracy, best streak."""
+    db = await get_db()
+    async with db.execute("SELECT COUNT(*) FROM questions") as cur:
+        parsed_total = (await cur.fetchone())[0]
+    async with db.execute(
+        "SELECT COUNT(*) FROM questions WHERE needs_review = 0"
+    ) as cur:
+        quizable_total = (await cur.fetchone())[0]
+    async with db.execute(
+        "SELECT COUNT(*) FROM question_progress WHERE correct_streak >= 2"
+    ) as cur:
+        mastered_count = (await cur.fetchone())[0]
+    async with db.execute("SELECT COUNT(*) FROM quiz_sessions") as cur:
+        total_sessions = (await cur.fetchone())[0]
+    async with db.execute("SELECT MAX(best_streak) FROM quiz_sessions") as cur:
+        best_streak = (await cur.fetchone())[0] or 0
+    
+    # Calculate average accuracy across all sessions
+    async with db.execute(
+        """SELECT AVG(CAST(total_correct AS FLOAT) / NULLIF(total_seen, 0)) * 100
+           FROM quiz_sessions WHERE total_seen > 0"""
+    ) as cur:
+        avg_accuracy = round((await cur.fetchone())[0] or 0.0, 1)
+    
+    return {
+        "mastered_count": mastered_count,
+        "quizable_total": quizable_total,
+        "parsed_total": parsed_total,
+        "total_sessions": total_sessions,
+        "avg_accuracy": avg_accuracy,
+        "best_streak_ever": best_streak,
+    }
+
+
+async def quiz_accuracy_trend(limit: int = 10) -> list[dict]:
+    """Last N sessions with accuracy for trend chart."""
+    db = await get_db()
+    async with db.execute(
+        """SELECT id, started_at, 
+                  CAST(total_correct AS FLOAT) / NULLIF(total_seen, 0) * 100 AS accuracy
+           FROM quiz_sessions
+           WHERE total_seen > 0 AND batch_size IS NOT NULL
+           ORDER BY id DESC
+           LIMIT ?
+        """, (limit,)
+    ) as cur:
+        rows = await cur.fetchall()
+    return [
+        {
+            "session_id": r["id"],
+            "started_at": r["started_at"],
+            "accuracy": round(r["accuracy"], 1),
+        }
+        for r in rows
+    ]

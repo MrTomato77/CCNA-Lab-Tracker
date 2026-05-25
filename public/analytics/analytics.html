@@ -11,6 +11,8 @@
     <div x-show="loading" class="loading"><span class="spinner"></span> Loading…</div>
     <template x-if="!loading">
       <div class="timeline">
+        <!-- Practical Section -->
+        <h2 class="analytics-section-title">Practical</h2>
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-num" x-text="summary.done"></div>
@@ -34,12 +36,12 @@
           </div>
         </div>
 
-        <h2 class="section-head">Time per Lab — slowest first</h2>
+        <h3 class="section-head">Time per Lab — slowest first</h3>
         <div class="section-body">
           <canvas id="timeChart" height="80"></canvas>
         </div>
 
-        <h2 class="section-head">Progress by Category</h2>
+        <h3 class="section-head">Progress by Category</h3>
         <div class="section-body">
           <div class="category-bars">
             <template x-for="cat in byCategory" :key="cat.category">
@@ -52,6 +54,41 @@
               </div>
             </template>
           </div>
+        </div>
+
+        <!-- Quiz Section -->
+        <h2 class="analytics-section-title analytics-section-title--quiz">Quiz</h2>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-num" x-text="quizSummary.mastered_count"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Mastered</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="quizSummary.quizable_total"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Quizable</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="quizSummary.avg_accuracy"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Avg Accuracy</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-num" x-text="quizSummary.total_sessions"></div>
+            <div class="stat-rule"></div>
+            <div class="stat-label">Sessions</div>
+          </div>
+        </div>
+
+        <h3 class="section-head">Accuracy Trend (last 10 sessions)</h3>
+        <div class="section-body">
+          <canvas id="accuracyChart" height="80"></canvas>
+        </div>
+
+        <div class="quiz-streak">
+          <span class="quiz-streak-label">Best Streak Ever:</span>
+          <span class="quiz-streak-value" x-text="quizSummary.best_streak_ever"></span>
         </div>
       </div>
     </template>
