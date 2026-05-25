@@ -155,3 +155,11 @@
 }
 .modal-btn--danger:hover { opacity: 0.85; }
 [data-theme="dark"] .modal-btn--ok { color: var(--bg); }
+
+/* Empty-state text — used by import (no missing labs), quiz (no sessions), etc. */
+.empty-state {
+  font-size: 14px;
+  color: var(--text-3);
+  padding: 16px 0;
+  font-style: normal;
+}

@@ -26,7 +26,10 @@ window.importPage = function() {
     },
 
     async handleFileInput(e) {
-      await this.uploadFiles(Array.from(e.target.files));
+      // Mirror handleDrop's filter — accept attribute is browser hint only
+      // and users can bypass it via the "All Files" option in the OS dialog.
+      const files = Array.from(e.target.files).filter(f => f.name.endsWith(".pka"));
+      await this.uploadFiles(files);
     },
 
     async uploadFiles(files) {

@@ -119,13 +119,6 @@
   color: var(--text-3);
 }
 
-.empty-state {
-  font-size: 14px;
-  color: var(--text-3);
-  padding: 16px 0;
-  font-style: normal;
-}
-
 .missing-list {
   display: flex;
   flex-direction: column;
