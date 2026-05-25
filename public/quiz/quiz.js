@@ -243,7 +243,6 @@ window.quizPage = function() {
         return;
       }
       this._stopTimer();
-      this.view = "loading";
       try {
         const json = await api(
           `/api/quiz/sessions/${this.sessionId}/finish`, { method: "POST" });
@@ -262,7 +261,6 @@ window.quizPage = function() {
     },
 
     async viewSession(sessionId) {
-      this.view = "loading";
       try {
         const json = await api(`/api/quiz/sessions/${sessionId}/summary`);
         if (!json.success) {
@@ -298,7 +296,11 @@ window.quizPage = function() {
       this.summaryView  = 'wrong';
       this.selection    = [];
       this.feedback     = null;
-      await this.loadDashboard();
+      if (!this.dashboard) {
+        await this.loadDashboard();
+      } else {
+        this.view = "landing";
+      }
     },
   };
 };
