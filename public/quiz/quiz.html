@@ -176,7 +176,7 @@
 
       <!-- Toggle: Wrong / Correct -->
       <div class="quiz-summary-header">
-        <button class="btn-primary btn-primary--ghost" @click="backToLanding()">← Back to landing</button>
+        <button class="quiz-exit-btn" @click="backToLanding()" title="Back to landing"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
         <div class="quiz-summary-toggle">
           <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${finalSummary.wrong_answers ? finalSummary.wrong_answers.length : 0})`"></button>
           <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${finalSummary.correct_answers ? finalSummary.correct_answers.length : 0})`"></button>
@@ -259,8 +259,8 @@
                       <ul class="quiz-answer-choices">
                         <template x-for="ch in c.choices" :key="ch.label">
                           <li :class="{
-                                'wrong-choice--correct': c.correct_labels.includes(ch.label),
-                                'wrong-choice--yours':   c.selected_labels.includes(ch.label)
+                                'correct-choice--yours': c.selected_labels.includes(ch.label),
+                                'wrong-choice--correct': c.correct_labels.includes(ch.label) && !c.selected_labels.includes(ch.label)
                               }">
                             <strong x-text="ch.label"></strong>
                             <span x-text="ch.text"></span>
@@ -292,7 +292,10 @@
     <div class="quiz-summary"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
-         x-transition:enter-end="quiz-view-enter-end">
+         x-transition:enter-end="quiz-view-enter-end"
+         x-transition:leave="quiz-view-leave"
+         x-transition:leave-start="quiz-view-leave-start"
+         x-transition:leave-end="quiz-view-leave-end">
       <header class="quiz-hero" style="margin-bottom: 24px;">
         <div class="quiz-hero-left">
           <div class="quiz-hero-stat">
@@ -310,7 +313,7 @@
 
       <!-- Toggle: Wrong / Correct -->
       <div class="quiz-summary-header">
-        <button class="btn-primary btn-primary--ghost" @click="backToLanding()">← Back to landing</button>
+        <button class="quiz-exit-btn" @click="backToLanding()" title="Back to landing"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
         <div class="quiz-summary-toggle">
           <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${reviewSummary.wrong_answers ? reviewSummary.wrong_answers.length : 0})`"></button>
           <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${reviewSummary.correct_answers ? reviewSummary.correct_answers.length : 0})`"></button>
@@ -393,8 +396,8 @@
                       <ul class="quiz-answer-choices">
                         <template x-for="ch in c.choices" :key="ch.label">
                           <li :class="{
-                                'wrong-choice--correct': c.correct_labels.includes(ch.label),
-                                'wrong-choice--yours':   c.selected_labels.includes(ch.label)
+                                'correct-choice--yours': c.selected_labels.includes(ch.label),
+                                'wrong-choice--correct': c.correct_labels.includes(ch.label) && !c.selected_labels.includes(ch.label)
                               }">
                             <strong x-text="ch.label"></strong>
                             <span x-text="ch.text"></span>

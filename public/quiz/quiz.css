@@ -358,6 +358,26 @@
   color: var(--text-1);
 }
 
+/* Exit icon button */
+.quiz-exit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.quiz-exit-btn:hover {
+  background: var(--surface-2);
+  color: var(--text-1);
+  border-color: var(--text-3);
+}
+
 /* View panel transitions (same pattern as Analytics) */
 .quiz-answer-panels {
   display: grid;
@@ -447,6 +467,10 @@
 .wrong-choice--yours {
   outline: 1px dashed var(--reset);
 }
+.correct-choice--yours {
+  background: var(--surface-tint-done);
+  color: var(--done);
+}
 
 @media (max-width: 720px) {
   .quiz-batch-grid    { grid-template-columns: repeat(2, 1fr); }
@@ -468,6 +492,14 @@
 }
 .quiz-view-enter-start { opacity: 0; transform: translateY(4px); }
 .quiz-view-enter-end   { opacity: 1; transform: none; }
+
+/* View leave (review → landing) */
+.quiz-view-leave {
+  transition: opacity 150ms var(--tx-easing-default),
+              transform 150ms var(--tx-easing-default);
+}
+.quiz-view-leave-start { opacity: 1; transform: none; }
+.quiz-view-leave-end   { opacity: 0; transform: translateY(-4px); }
 
 /* Question-advance slide-in (keyframe — fires on keyed remount of .quiz-question) */
 @keyframes qadv-in {
