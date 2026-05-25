@@ -3,6 +3,7 @@
 /* ── View panel transitions ─────────────────────────────────────────────── */
 .view-panel {
   transition: opacity 250ms ease, transform 250ms ease;
+  grid-area: 1 / 1;
 }
 .view-active {
   opacity: 1;
@@ -13,12 +14,11 @@
   opacity: 0;
   transform: translateY(12px);
   pointer-events: none;
-  position: absolute;
-  width: 100%;
 }
 
 .timeline {
   position: relative;
+  display: grid;
 }
 
 .page-header {
