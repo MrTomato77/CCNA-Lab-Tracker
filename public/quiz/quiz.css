@@ -494,6 +494,10 @@
 .quiz-page > .quiz-practice,
 .quiz-page > .quiz-summary {
   grid-area: 1 / 1;
+  width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  min-width: 0;
 }
 
 /* View enter (landing / practice / summary) */
