@@ -3,12 +3,12 @@
 
 
   <!-- LOADING -->
-  <template x-if="view==='loading'">
+  <div x-show="view==='loading'">
     <div class="loading"><span class="spinner"></span> Loading…</div>
-  </template>
+  </div>
 
   <!-- LANDING -->
-  <template x-if="view==='landing' && dashboard">
+  <div x-show="view==='landing' && dashboard"
     <div class="quiz-landing"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
@@ -67,10 +67,9 @@
       </div>
 
     </div>
-  </template>
 
   <!-- PRACTICE -->
-  <template x-if="view==='practice' && currentQ" :key="currentQ.question_id">
+  <div x-show="view==='practice' && currentQ" :key="currentQ.question_id"
     <div class="quiz-practice"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
@@ -157,10 +156,13 @@
         </div>
       </div>
     </div>
-  </template>
 
   <!-- SUMMARY -->
+<<<<<<< HEAD
   <template x-show="view==='summary' && 'finalSummary'">
+=======
+  <div x-show="view==='summary' && finalSummary"
+>>>>>>> 7a890a4 (fix(quiz): remove Practice again button, change x-if to x-show for smooth transitions)
     <div class="quiz-summary"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
@@ -289,11 +291,17 @@
           </template>
         </div>
       </div>
+<<<<<<< HEAD
     </div>
   </ะ>
 
   <!-- REVIEW (past session) -->
   <template x-if="view==='review' && 'reviewSummary'">
+=======
+
+  <!-- REVIEW (past session) -->
+  <div x-show="view==='review' && reviewSummary"
+>>>>>>> 7a890a4 (fix(quiz): remove Practice again button, change x-if to x-show for smooth transitions)
     <div class="quiz-summary"
          x-show="view==='review' && 'reviewSummary'"
          x-transition:enter="quiz-view-enter"
