@@ -366,15 +366,19 @@
   transition: opacity 250ms ease, transform 250ms ease;
   grid-area: 1 / 1;
 }
-.view-active {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
 .view-hidden {
   opacity: 0;
   transform: translateY(12px);
   pointer-events: none;
+  visibility: hidden;
+  transition: opacity 250ms ease, transform 250ms ease, visibility 0s 250ms ease;
+}
+.view-active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+  visibility: visible;
+  transition: opacity 250ms ease, transform 250ms ease, visibility 0s 0s ease;
 }
 
 .quiz-answer-list {
@@ -393,7 +397,7 @@
 .quiz-answer-item--correct { border-left: 3px solid var(--done); }
 .quiz-answer-summary {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   width: 100%;
   background: none;

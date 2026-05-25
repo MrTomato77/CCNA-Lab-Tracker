@@ -176,7 +176,7 @@
 
       <!-- Toggle: Wrong / Correct -->
       <div class="quiz-summary-header">
-        <div></div>
+        <button class="btn-primary btn-primary--ghost" @click="backToLanding()">← Back to landing</button>
         <div class="quiz-summary-toggle">
           <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${finalSummary.wrong_answers ? finalSummary.wrong_answers.length : 0})`"></button>
           <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${finalSummary.correct_answers ? finalSummary.correct_answers.length : 0})`"></button>
@@ -282,7 +282,6 @@
       </div>
 
       <div class="quiz-actions">
-        <button class="btn-primary btn-primary--ghost" @click="backToLanding()">Back to landing</button>
         <button class="btn-primary" @click="practiceAgain()">Practice again</button>
       </div>
     </div>
@@ -311,7 +310,7 @@
 
       <!-- Toggle: Wrong / Correct -->
       <div class="quiz-summary-header">
-        <div></div>
+        <button class="btn-primary btn-primary--ghost" @click="backToLanding()">← Back to landing</button>
         <div class="quiz-summary-toggle">
           <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${reviewSummary.wrong_answers ? reviewSummary.wrong_answers.length : 0})`"></button>
           <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${reviewSummary.correct_answers ? reviewSummary.correct_answers.length : 0})`"></button>
@@ -417,7 +416,6 @@
       </div>
 
       <div class="quiz-actions">
-        <button class="btn-primary btn-primary--ghost" @click="backToLanding()">← Back to landing</button>
       </div>
     </div>
   </template>
