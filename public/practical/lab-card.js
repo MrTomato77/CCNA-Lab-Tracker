@@ -1,7 +1,8 @@
 // practical/lab-card.js — window.labCard Alpine component.
 // Single lab-row state: timer ticking, launch/stop/done actions,
 // status pill, per-card reset, brief modal dispatch.
-// Depends on core/main.js for api(), Alpine stores, showToast, Transitions.
+// Depends on core/main.js for STATUS, TIMER_RESUME_CAP_SEC, formatTime(),
+// api(), Alpine stores (modal/summaryModal/app), showToast.
 
 // ── Lab Card ──────────────────────────────────────────────────────────────
 window.labCard = function(initialLab) {
@@ -167,10 +168,6 @@ window.labCard = function(initialLab) {
 
     formatTime(s = 0) { return formatTime(s, 'clock'); },
 
-    statusLabel() {
-      return STATUS_LABELS[this.lab.status] ?? "";
-    },
-    badgeClass() { return `badge badge--${this.lab.status}`; },
     cardClass()  {
       const base = `lab-card lab-card--${this.lab.status}`;
       return this.lab.file_path ? base : base + " lab-card--no-file";
