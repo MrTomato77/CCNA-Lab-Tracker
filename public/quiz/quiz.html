@@ -160,7 +160,7 @@
   </template>
 
   <!-- SUMMARY -->
-  <div x-show="view==='summary' && 'finalSummary'">
+  <template x-show="view==='summary' && 'finalSummary'">
     <div class="quiz-summary"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
@@ -290,10 +290,10 @@
         </div>
       </div>
     </div>
-  </div>
+  </ะ>
 
   <!-- REVIEW (past session) -->
-  <div x-show="view==='review' && 'reviewSummary'">
+  <template x-if="view==='review' && 'reviewSummary'">
     <div class="quiz-summary"
          x-show="view==='review' && 'reviewSummary'"
          x-transition:enter="quiz-view-enter"
@@ -424,5 +424,5 @@
         </div>
       </div>
     </div>
-  </div>
+  </tem>
 </div>
