@@ -488,6 +488,7 @@
    smoothly instead of pushing each other down the page. */
 .quiz-page {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
 }
 .quiz-page > .quiz-landing,
 .quiz-page > .quiz-practice,
