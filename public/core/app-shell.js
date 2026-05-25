@@ -31,12 +31,15 @@ window.appShell = function() {
         visible: false,
       };
       this.panels.push(next);
-      this.$nextTick(() => {
+      // Two rAFs: first lets Alpine mount the new panel in `view-hidden`;
+      // second lets the browser paint that initial state. Without the gap
+      // the class flips in one frame and CSS sees no transition.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
         next.visible = true;
         setTimeout(() => {
           this.panels = this.panels.filter(p => p.visible);
         }, 300);
-      });
+      }));
     },
 
     async init() {
