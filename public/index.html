@@ -27,6 +27,7 @@
   <link rel="stylesheet" href="practical/practical.css">
   <link rel="stylesheet" href="practical/lab-card.css">
   <link rel="stylesheet" href="import/import.css">
+  <link rel="stylesheet" href="analytics/analytics.css">
   <link rel="stylesheet" href="style.css">
   <!-- Chart.js MUST load before Alpine (synchronous) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -34,6 +35,7 @@
   <script src="core/app-shell.js" defer></script>
   <script src="practical/lab-card.js" defer></script>
   <script src="import/import.js" defer></script>
+  <script src="analytics/analytics.js" defer></script>
   <script src="app.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
 </head>
@@ -45,61 +47,7 @@
 
   <!--INCLUDE:import/import.html-->
 
-  <!-- ANALYTICS PAGE -->
-  <div class="page" x-show="page==='stats'" x-data="statsPage()" x-init="load()">
-    <header class="page-header">
-      <h1 class="page-title">Analytics.</h1>
-      <p class="page-subtitle">A study journal in numbers</p>
-    </header>
-
-    <div x-show="loading" class="loading"><span class="spinner"></span> Loading…</div>
-    <template x-if="!loading">
-      <div class="timeline">
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-num" x-text="summary.done"></div>
-            <div class="stat-rule"></div>
-            <div class="stat-label">Done</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num" x-text="summary.in_progress"></div>
-            <div class="stat-rule"></div>
-            <div class="stat-label">In Progress</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num" x-text="summary.not_started"></div>
-            <div class="stat-rule"></div>
-            <div class="stat-label">Not Started</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-num stat-num--time" x-html="formatTimeRich(summary.total_time_spent)"></div>
-            <div class="stat-rule"></div>
-            <div class="stat-label">Total Time</div>
-          </div>
-        </div>
-
-        <h2 class="section-head">Time per Lab — slowest first</h2>
-        <div class="section-body">
-          <canvas id="timeChart" height="80"></canvas>
-        </div>
-
-        <h2 class="section-head">Progress by Category</h2>
-        <div class="section-body">
-          <div class="category-bars">
-            <template x-for="cat in byCategory" :key="cat.category">
-              <div class="cat-row">
-                <span class="cat-name" x-text="cat.category"></span>
-                <div class="cat-track">
-                  <div class="cat-fill" :style="`width:${cat.total>0?(cat.done/cat.total)*100:0}%`"></div>
-                </div>
-                <span class="cat-count" x-text="`${cat.done} / ${cat.total}`"></span>
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
-    </template>
-  </div>
+  <!--INCLUDE:analytics/analytics.html-->
 
   <!-- QUIZ PAGE (v2) -->
   <div class="page" x-show="page==='quiz'" x-data="quizPage()" x-init="init()">
