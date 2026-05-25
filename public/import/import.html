@@ -1,0 +1,77 @@
+<!-- import/import.html — import page partial (UI label: Import).
+     Stitched into index.html by app.py _build_index() via an
+     INCLUDE marker. Do NOT add html/body wrappers; do NOT nest
+     INCLUDE markers (single-pass expansion only). -->
+<div class="page" x-show="page==='import'" x-data="importPage()" x-init="loadStatus()">
+  <header class="page-header">
+    <h1 class="page-title">Import.</h1>
+    <p class="page-subtitle">Bring labs into the tracker</p>
+  </header>
+
+  <div class="timeline">
+    <h2 class="section-head">Method 1 — Upload</h2>
+    <div class="section-body">
+      <div class="dropzone"
+        @dragover.prevent="dragging=true"
+        @dragleave.prevent="dragging=false"
+        @drop.prevent="handleDrop($event)"
+        :class="{dragging}">
+        <p class="dropzone-primary">Drag &amp; drop <code>.pka</code> files here</p>
+        <p class="dropzone-sep">— or —</p>
+        <input type="file" id="fileInput" multiple accept=".pka" @change="handleFileInput($event)">
+        <label for="fileInput" class="btn-primary btn-primary--ghost">Browse Files</label>
+      </div>
+    </div>
+
+    <h2 class="section-head">Method 2 — Scan Folder</h2>
+    <div class="section-body">
+      <div class="folder-input-row">
+        <input type="text" x-model="folderPath" class="folder-input"
+               placeholder="e.g. D:\CCNA Network Labs Professional\Labs">
+        <button @click="scanFolder()" :disabled="scanning" class="btn-primary">
+          <span x-show="!scanning">Scan</span>
+          <span x-show="scanning">Scanning…</span>
+        </button>
+      </div>
+    </div>
+
+    <template x-if="results.length > 0">
+      <div>
+        <h2 class="section-head" x-text="`Results — ${importedCount} of ${results.length} imported`"></h2>
+        <div class="section-body">
+          <div class="result-list">
+            <template x-for="r in results" :key="r.file">
+              <div class="result-row" :class="`result--${r.status}`">
+                <span class="result-glyph" x-text="r.status==='imported'?'✓':r.status==='skipped'?'!':'×'"></span>
+                <span class="result-file" x-text="r.file"></span>
+                <span class="result-detail" x-text="r.lab_id ?? r.reason"></span>
+              </div>
+            </template>
+            <button @click="window.dispatchEvent(new CustomEvent('refresh-labs')); page='dashboard'" class="btn-primary" style="margin-top:16px">
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <h2 class="section-head" x-text="`Status — ${status.imported_count} of ${status.total} imported`"></h2>
+    <div class="section-body">
+      <template x-if="status.missing.length === 0">
+        <p class="empty-state">All labs imported. Nothing missing.</p>
+      </template>
+      <div class="missing-list">
+        <template x-for="lab in status.missing" :key="lab.id">
+          <div class="missing-row">
+            <span class="missing-id" x-text="lab.id"></span>
+            <span class="missing-cat" x-text="lab.category"></span>
+            <span class="missing-name" x-text="lab.name"></span>
+            <span class="status-pill status-pill--missing">
+              <span class="status-dot"></span>Missing
+            </span>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</div>
