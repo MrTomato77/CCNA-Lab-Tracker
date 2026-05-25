@@ -31,11 +31,14 @@ window.appShell = function() {
         visible: false,
       };
       this.panels.push(next);
+      const nextIdx = this.panels.length - 1;
       // Two rAFs: first lets Alpine mount the new panel in `view-hidden`;
       // second lets the browser paint that initial state. Without the gap
       // the class flips in one frame and CSS sees no transition.
+      // Mutate via the array index — the local `next` ref is the raw object,
+      // while the array proxy holds the reactive copy.
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        next.visible = true;
+        if (this.panels[nextIdx]) this.panels[nextIdx].visible = true;
         setTimeout(() => {
           this.panels = this.panels.filter(p => p.visible);
         }, 300);
