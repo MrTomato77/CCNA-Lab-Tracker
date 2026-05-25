@@ -27,5 +27,4 @@ async def quiz_summary(request: Request) -> dict:
 
 @router.get("/quiz-accuracy-trend")
 async def quiz_accuracy_trend(request: Request) -> dict:
-    limit = int(request.query_params.get("limit", 10))
-    return ok(await stats_service.quiz_accuracy_trend(limit))
+    return ok(await stats_service.quiz_accuracy_trend(10))
