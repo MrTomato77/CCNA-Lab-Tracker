@@ -21,6 +21,35 @@
   font-weight: 400;
 }
 
+/* ── Analytics toggle ───────────────────────────────────────────────────── */
+
+.analytics-toggle {
+  display: inline-flex;
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  gap: 2px;
+  margin-bottom: 24px;
+}
+.analytics-toggle-btn {
+  padding: 6px 20px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-3);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+.analytics-toggle-btn:hover {
+  color: var(--text);
+}
+.analytics-toggle-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ── Analytics page ───────────────────────────────────────────────────── */
 
 .stats-grid {

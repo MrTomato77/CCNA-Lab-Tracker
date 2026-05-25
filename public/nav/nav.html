@@ -13,10 +13,9 @@
         <!-- Import tab hidden - no longer needed -->
         <!-- <button class="nav-tab" @click="page='import'"    :class="{active: page==='import'}">Import</button> -->
         <button class="nav-tab" @click="page='stats'"     :class="{active: page==='stats'}">Analytics</button>
-        <button class="nav-tab" @click="page='settings'"  :class="{active: page==='settings'}">Settings</button>
       </div>
       <div class="nav-utility">
-        <button class="nav-reset" @click="page='settings'">⚙</button>
+        <button class="nav-settings" @click="page='settings'" :class="{active: page==='settings'}" title="Settings">⚙</button>
       </div>
     </div>
   </nav>

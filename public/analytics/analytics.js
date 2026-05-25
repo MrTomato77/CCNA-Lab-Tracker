@@ -5,8 +5,17 @@
 window.statsPage = function() {
   return {
     loading: true,
+    analyticsView: 'practical',
     byCategory: [],
-    quizSummary: {},
+    quizSummary: {
+      mastered_count: 0,
+      quizable_total: 0,
+      parsed_total: 0,
+      total_sessions: 0,
+      avg_accuracy: 0,
+      best_streak_ever: 0,
+    },
+    quizLoaded: false,
     chart: null,
     accuracyChart: null,
 
@@ -15,27 +24,38 @@ window.statsPage = function() {
     async load() {
       this.loading = true;
       try {
-        const [, cat, slow, quiz, accuracyTrend] = await Promise.all([
+        // Load practical data first
+        const [summaryOk, cat, slow] = await Promise.all([
           this.$store.app.refreshSummary(),
           api("/api/stats/by-category"),
           api("/api/stats/slowest"),
+        ]);
+        this.byCategory = cat.data;
+        const slowest = slow.data;
+        this._slowest = slowest;
+      } catch (e) {
+        console.error("Practical stats load failed:", e);
+      }
+
+      // Load quiz data separately - failure shouldn't block practical data
+      try {
+        const [quiz, accuracyTrend] = await Promise.all([
           api("/api/stats/quiz-summary"),
           api("/api/stats/quiz-accuracy-trend"),
         ]);
-        this.byCategory = cat.data;
-        const slowest   = slow.data;
-        this._slowest   = slowest;
-        this.quizSummary = quiz.data;
-        this._accuracyTrend = accuracyTrend.data;
-        this.loading    = false;
-        await this.$nextTick();  // x-if unmounts canvas while loading=true
-        this.renderChart(slowest);
-        this.renderAccuracyChart(accuracyTrend.data);
-        bindStatsThemeListener(() => this);
+        this.quizSummary = quiz.data || this.quizSummary;
+        this._accuracyTrend = accuracyTrend.data || [];
+        this.quizLoaded = true;
       } catch (e) {
-        console.error("Stats load failed:", e);
-        this.loading = false;
+        console.error("Quiz stats load failed:", e);
+        this.quizLoaded = false;
       }
+
+      this.loading = false;
+      await this.$nextTick();
+      if (this._slowest) this.renderChart(this._slowest);
+      if (this.quizLoaded && this._accuracyTrend) this.renderAccuracyChart(this._accuracyTrend);
+      bindStatsThemeListener(() => this);
     },
 
     renderChart(data) {
@@ -144,6 +164,6 @@ function bindStatsThemeListener(getCurrent) {
   window.addEventListener('theme-changed', () => {
     const cur = _statsRef && _statsRef();
     if (cur && cur._slowest) cur.renderChart(cur._slowest);
-    if (cur && cur._accuracyTrend) cur.renderAccuracyChart(cur._accuracyTrend);
+    if (cur && cur.quizLoaded && cur._accuracyTrend) cur.renderAccuracyChart(cur._accuracyTrend);
   });
 }

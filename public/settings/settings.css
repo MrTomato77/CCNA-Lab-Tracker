@@ -96,13 +96,22 @@
 /* ── Danger button variant ──────────────────────────────────────────────── */
 
 .btn-primary--danger {
-  background: var(--danger);
-  border-color: var(--danger);
+  background: var(--reset);
+  border-color: var(--reset);
   color: #ffffff;
 }
 .btn-primary--danger:hover {
   background: #c53030;
   border-color: #c53030;
+}
+[data-theme="dark"] .btn-primary--danger {
+  background: #e07878;
+  border-color: #e07878;
+  color: #0f1320;
+}
+[data-theme="dark"] .btn-primary--danger:hover {
+  background: #f5a5a5;
+  border-color: #f5a5a5;
 }
 
 @media (max-width: 640px) {

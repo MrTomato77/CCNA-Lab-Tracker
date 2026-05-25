@@ -68,14 +68,19 @@
 }
 .theme-toggle:hover { color: var(--text); background: var(--surface); }
 
-.nav-reset {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-3);
-  padding: 8px 14px;
+.nav-settings {
+  width: 36px; height: 36px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
   border-radius: var(--radius);
+  font-size: 18px;
+  color: var(--text-3);
 }
-.nav-reset:hover { color: var(--reset); background: var(--reset-tint); }
+.nav-settings:hover { color: var(--text); background: var(--surface); }
+.nav-settings.active {
+  color: var(--accent-text);
+  background: var(--accent-tint);
+}
 
 @media (max-width: 960px) {
   .topnav-inner { padding: 14px 20px; gap: 16px; }
