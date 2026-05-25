@@ -12,7 +12,7 @@ window.quizPage = function() {
 
   return {
     BATCH_SIZES,
-    view: "loading",          // loading | landing | practice | summary
+    view: "loading",          // loading | landing | practice | summary | review
     dashboard: null,
     sessionId: null,
     pickedN: null,
@@ -21,6 +21,8 @@ window.quizPage = function() {
     feedback: null,
     submitting: false,
     finalSummary: null,
+    reviewSummary: null,
+    summaryView: 'wrong',
     startedAt: 0,             // ms
     elapsed: 0,               // ms
     elapsedFormatted: "00:00",
@@ -251,10 +253,29 @@ window.quizPage = function() {
           return;
         }
         this.finalSummary = json.data;
+        this.summaryView = 'wrong';
         this.view = "summary";
       } catch (e) {
         window.showToast("× Network error", "error");
         this.view = "practice";
+      }
+    },
+
+    async viewSession(sessionId) {
+      this.view = "loading";
+      try {
+        const json = await api(`/api/quiz/sessions/${sessionId}/summary`);
+        if (!json.success) {
+          window.showToast("× " + json.error, "error");
+          this.view = "landing";
+          return;
+        }
+        this.reviewSummary = json.data;
+        this.summaryView = 'wrong';
+        this.view = "review";
+      } catch (e) {
+        window.showToast("× Network error", "error");
+        this.view = "landing";
       }
     },
 
@@ -273,6 +294,8 @@ window.quizPage = function() {
       this.sessionId    = null;
       this.currentQ     = null;
       this.finalSummary = null;
+      this.reviewSummary = null;
+      this.summaryView  = 'wrong';
       this.selection    = [];
       this.feedback     = null;
       await this.loadDashboard();

@@ -54,10 +54,11 @@
           <p class="empty-state">No sessions yet.</p>
         </template>
         <template x-for="s in dashboard.recent_sessions" :key="s.id">
-          <div class="quiz-history-row">
+          <div class="quiz-history-row" @click="viewSession(s.id)">
             <span class="quiz-history-score" x-text="`${s.total_correct}/${s.total_seen}`"></span>
             <span class="quiz-history-pct"   x-text="`(${s.accuracy}%)`"></span>
             <span class="quiz-history-meta"  x-text="`· ${formatDur(s.duration_sec)} · best ${s.best_streak} · ${ago(s.started_at)}`"></span>
+            <span class="quiz-history-arrow">→</span>
           </div>
         </template>
       </div>
@@ -173,60 +174,250 @@
         <div class="progress-track"><div class="progress-fill" :style="`width:${finalSummary.accuracy}%`"></div></div>
       </header>
 
-      <template x-if="finalSummary.wrong_answers && finalSummary.wrong_answers.length > 0">
-        <div>
-          <div class="quiz-wrong-list">
-            <template x-for="w in finalSummary.wrong_answers" :key="w.question_id">
-              <div class="quiz-wrong-item" x-data="{ open: false, showTh: false }">
-                <!-- div+role="button" because nested <button> would be invalid HTML
-                     (browser auto-moves the inner toggle out of the outer button,
-                     breaking Alpine's @click scope and the x-transition lifecycle). -->
-                <div class="quiz-wrong-summary"
-                     role="button"
-                     tabindex="0"
-                     :aria-expanded="open"
-                     @click="open = !open"
-                     @keydown.enter.prevent="open = !open"
-                     @keydown.space.prevent="open = !open">
-                  <span class="quiz-wrong-prompt"
-                        x-text="showTh && w.prompt_th ? w.prompt_th : w.prompt_en"></span>
-                  <button type="button"
-                          class="btn-brief quiz-lang-toggle"
-                          x-show="w.prompt_th"
-                          @click.stop="showTh = !showTh"
-                          x-text="showTh ? 'EN' : 'TH'"></button>
-                  <span class="quiz-wrong-chevron" :class="{ 'is-open': open }">›</span>
-                </div>
-                <!-- grid-rows trick: outer is display:grid with rows transitioning
-                     0fr ↔ 1fr; inner clips with overflow:hidden. Avoids Alpine's
-                     x-transition machinery which threw uncaught promise rejections
-                     on every toggle for our class names. -->
-                <div class="quiz-wrong-body-wrap" :class="{ 'is-open': open }">
-                  <div class="quiz-wrong-body">
-                    <ul class="quiz-wrong-choices">
-                      <template x-for="c in w.choices" :key="c.label">
-                        <li :class="{
-                              'wrong-choice--correct': w.correct_labels.includes(c.label),
-                              'wrong-choice--yours':   w.selected_labels.includes(c.label)
-                            }">
-                          <strong x-text="c.label"></strong>
-                          <span x-text="c.text"></span>
-                        </li>
-                      </template>
-                    </ul>
-                    <p class="quiz-feedback-explanation"
-                       x-show="w.explanation" x-text="w.explanation"></p>
+      <!-- Toggle: Wrong / Correct -->
+      <div class="quiz-summary-header">
+        <div></div>
+        <div class="quiz-summary-toggle">
+          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${finalSummary.wrong_answers ? finalSummary.wrong_answers.length : 0})`"></button>
+          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${finalSummary.correct_answers ? finalSummary.correct_answers.length : 0})`"></button>
+        </div>
+      </div>
+
+      <div class="quiz-answer-panels">
+        <!-- Wrong answers panel -->
+        <div class="view-panel" :class="summaryView==='wrong' ? 'view-active' : 'view-hidden'">
+          <template x-if="finalSummary.wrong_answers && finalSummary.wrong_answers.length > 0">
+            <div class="quiz-answer-list">
+              <template x-for="w in finalSummary.wrong_answers" :key="w.question_id">
+                <div class="quiz-answer-item quiz-answer-item--wrong" x-data="{ open: false, showTh: false }">
+                  <div class="quiz-answer-summary"
+                       role="button"
+                       tabindex="0"
+                       :aria-expanded="open"
+                       @click="open = !open"
+                       @keydown.enter.prevent="open = !open"
+                       @keydown.space.prevent="open = !open">
+                    <span class="quiz-answer-prompt"
+                          x-text="showTh && w.prompt_th ? w.prompt_th : w.prompt_en"></span>
+                    <button type="button"
+                            class="btn-brief quiz-lang-toggle"
+                            x-show="w.prompt_th"
+                            @click.stop="showTh = !showTh"
+                            x-text="showTh ? 'EN' : 'TH'"></button>
+                    <span class="quiz-answer-chevron" :class="{ 'is-open': open }">›</span>
+                  </div>
+                  <div class="quiz-answer-body-wrap" :class="{ 'is-open': open }">
+                    <div class="quiz-answer-body">
+                      <ul class="quiz-answer-choices">
+                        <template x-for="c in w.choices" :key="c.label">
+                          <li :class="{
+                                'wrong-choice--correct': w.correct_labels.includes(c.label),
+                                'wrong-choice--yours':   w.selected_labels.includes(c.label)
+                              }">
+                            <strong x-text="c.label"></strong>
+                            <span x-text="c.text"></span>
+                          </li>
+                        </template>
+                      </ul>
+                      <p class="quiz-feedback-explanation"
+                         x-show="w.explanation" x-text="w.explanation"></p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </template>
-          </div>
+              </template>
+            </div>
+          </template>
+          <template x-if="!finalSummary.wrong_answers || finalSummary.wrong_answers.length === 0">
+            <p class="empty-state">No wrong answers — great job!</p>
+          </template>
         </div>
-      </template>
+
+        <!-- Correct answers panel -->
+        <div class="view-panel" :class="summaryView==='correct' ? 'view-active' : 'view-hidden'">
+          <template x-if="finalSummary.correct_answers && finalSummary.correct_answers.length > 0">
+            <div class="quiz-answer-list">
+              <template x-for="c in finalSummary.correct_answers" :key="c.question_id">
+                <div class="quiz-answer-item quiz-answer-item--correct" x-data="{ open: false, showTh: false }">
+                  <div class="quiz-answer-summary"
+                       role="button"
+                       tabindex="0"
+                       :aria-expanded="open"
+                       @click="open = !open"
+                       @keydown.enter.prevent="open = !open"
+                       @keydown.space.prevent="open = !open">
+                    <span class="quiz-answer-prompt"
+                          x-text="showTh && c.prompt_th ? c.prompt_th : c.prompt_en"></span>
+                    <button type="button"
+                            class="btn-brief quiz-lang-toggle"
+                            x-show="c.prompt_th"
+                            @click.stop="showTh = !showTh"
+                            x-text="showTh ? 'EN' : 'TH'"></button>
+                    <span class="quiz-answer-chevron" :class="{ 'is-open': open }">›</span>
+                  </div>
+                  <div class="quiz-answer-body-wrap" :class="{ 'is-open': open }">
+                    <div class="quiz-answer-body">
+                      <ul class="quiz-answer-choices">
+                        <template x-for="ch in c.choices" :key="ch.label">
+                          <li :class="{
+                                'wrong-choice--correct': c.correct_labels.includes(ch.label),
+                                'wrong-choice--yours':   c.selected_labels.includes(ch.label)
+                              }">
+                            <strong x-text="ch.label"></strong>
+                            <span x-text="ch.text"></span>
+                          </li>
+                        </template>
+                      </ul>
+                      <p class="quiz-feedback-explanation"
+                         x-show="c.explanation" x-text="c.explanation"></p>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <template x-if="!finalSummary.correct_answers || finalSummary.correct_answers.length === 0">
+            <p class="empty-state">No correct answers yet.</p>
+          </template>
+        </div>
+      </div>
 
       <div class="quiz-actions">
         <button class="btn-primary btn-primary--ghost" @click="backToLanding()">Back to landing</button>
         <button class="btn-primary" @click="practiceAgain()">Practice again</button>
+      </div>
+    </div>
+  </template>
+
+  <!-- REVIEW (past session) -->
+  <template x-if="view==='review' && reviewSummary">
+    <div class="quiz-summary"
+         x-transition:enter="quiz-view-enter"
+         x-transition:enter-start="quiz-view-enter-start"
+         x-transition:enter-end="quiz-view-enter-end">
+      <header class="quiz-hero" style="margin-bottom: 24px;">
+        <div class="quiz-hero-left">
+          <div class="quiz-hero-stat">
+            <span x-text="reviewSummary.total_correct"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="reviewSummary.total_seen"></span>
+          </div>
+          <div class="quiz-hero-rule"></div>
+          <div class="quiz-hero-label">Score</div>
+        </div>
+        <div class="quiz-hero-right">
+          <div class="quiz-hero-percent" x-text="`${reviewSummary.accuracy}% accuracy`"></div>
+          <div class="quiz-hero-sub" x-text="`Duration: ${formatDur(reviewSummary.duration_sec)}`"></div>
+        </div>
+        <div class="progress-track"><div class="progress-fill" :style="`width:${reviewSummary.accuracy}%`"></div></div>
+      </header>
+
+      <!-- Toggle: Wrong / Correct -->
+      <div class="quiz-summary-header">
+        <div></div>
+        <div class="quiz-summary-toggle">
+          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${reviewSummary.wrong_answers ? reviewSummary.wrong_answers.length : 0})`"></button>
+          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${reviewSummary.correct_answers ? reviewSummary.correct_answers.length : 0})`"></button>
+        </div>
+      </div>
+
+      <div class="quiz-answer-panels">
+        <!-- Wrong answers panel -->
+        <div class="view-panel" :class="summaryView==='wrong' ? 'view-active' : 'view-hidden'">
+          <template x-if="reviewSummary.wrong_answers && reviewSummary.wrong_answers.length > 0">
+            <div class="quiz-answer-list">
+              <template x-for="w in reviewSummary.wrong_answers" :key="w.question_id">
+                <div class="quiz-answer-item quiz-answer-item--wrong" x-data="{ open: false, showTh: false }">
+                  <div class="quiz-answer-summary"
+                       role="button"
+                       tabindex="0"
+                       :aria-expanded="open"
+                       @click="open = !open"
+                       @keydown.enter.prevent="open = !open"
+                       @keydown.space.prevent="open = !open">
+                    <span class="quiz-answer-prompt"
+                          x-text="showTh && w.prompt_th ? w.prompt_th : w.prompt_en"></span>
+                    <button type="button"
+                            class="btn-brief quiz-lang-toggle"
+                            x-show="w.prompt_th"
+                            @click.stop="showTh = !showTh"
+                            x-text="showTh ? 'EN' : 'TH'"></button>
+                    <span class="quiz-answer-chevron" :class="{ 'is-open': open }">›</span>
+                  </div>
+                  <div class="quiz-answer-body-wrap" :class="{ 'is-open': open }">
+                    <div class="quiz-answer-body">
+                      <ul class="quiz-answer-choices">
+                        <template x-for="c in w.choices" :key="c.label">
+                          <li :class="{
+                                'wrong-choice--correct': w.correct_labels.includes(c.label),
+                                'wrong-choice--yours':   w.selected_labels.includes(c.label)
+                              }">
+                            <strong x-text="c.label"></strong>
+                            <span x-text="c.text"></span>
+                          </li>
+                        </template>
+                      </ul>
+                      <p class="quiz-feedback-explanation"
+                         x-show="w.explanation" x-text="w.explanation"></p>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <template x-if="!reviewSummary.wrong_answers || reviewSummary.wrong_answers.length === 0">
+            <p class="empty-state">No wrong answers — great job!</p>
+          </template>
+        </div>
+
+        <!-- Correct answers panel -->
+        <div class="view-panel" :class="summaryView==='correct' ? 'view-active' : 'view-hidden'">
+          <template x-if="reviewSummary.correct_answers && reviewSummary.correct_answers.length > 0">
+            <div class="quiz-answer-list">
+              <template x-for="c in reviewSummary.correct_answers" :key="c.question_id">
+                <div class="quiz-answer-item quiz-answer-item--correct" x-data="{ open: false, showTh: false }">
+                  <div class="quiz-answer-summary"
+                       role="button"
+                       tabindex="0"
+                       :aria-expanded="open"
+                       @click="open = !open"
+                       @keydown.enter.prevent="open = !open"
+                       @keydown.space.prevent="open = !open">
+                    <span class="quiz-answer-prompt"
+                          x-text="showTh && c.prompt_th ? c.prompt_th : c.prompt_en"></span>
+                    <button type="button"
+                            class="btn-brief quiz-lang-toggle"
+                            x-show="c.prompt_th"
+                            @click.stop="showTh = !showTh"
+                            x-text="showTh ? 'EN' : 'TH'"></button>
+                    <span class="quiz-answer-chevron" :class="{ 'is-open': open }">›</span>
+                  </div>
+                  <div class="quiz-answer-body-wrap" :class="{ 'is-open': open }">
+                    <div class="quiz-answer-body">
+                      <ul class="quiz-answer-choices">
+                        <template x-for="ch in c.choices" :key="ch.label">
+                          <li :class="{
+                                'wrong-choice--correct': c.correct_labels.includes(ch.label),
+                                'wrong-choice--yours':   c.selected_labels.includes(ch.label)
+                              }">
+                            <strong x-text="ch.label"></strong>
+                            <span x-text="ch.text"></span>
+                          </li>
+                        </template>
+                      </ul>
+                      <p class="quiz-feedback-explanation"
+                         x-show="c.explanation" x-text="c.explanation"></p>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+          <template x-if="!reviewSummary.correct_answers || reviewSummary.correct_answers.length === 0">
+            <p class="empty-state">No correct answers.</p>
+          </template>
+        </div>
+      </div>
+
+      <div class="quiz-actions">
+        <button class="btn-primary btn-primary--ghost" @click="backToLanding()">← Back to landing</button>
       </div>
     </div>
   </template>

@@ -126,6 +126,17 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.quiz-history-row:hover {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.quiz-history-arrow {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 14px;
 }
 .quiz-history-score { font-weight: 600; color: var(--text-1); }
 .quiz-history-pct   { color: var(--accent); }
@@ -310,23 +321,77 @@
   padding-top: 4px;
 }
 
-/* Summary wrong-answer accordion */
+/* Summary answer toggle */
 .quiz-summary {
   margin: 0px auto 0;
 }
-.quiz-wrong-list {
+.quiz-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.quiz-summary-toggle {
+  display: inline-flex;
+  background: var(--surface-2);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  gap: 2px;
+}
+.quiz-summary-toggle-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-3);
+  font-family: inherit;
+  transition: background 150ms ease, color 150ms ease;
+}
+.quiz-summary-toggle-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+.quiz-summary-toggle-btn:hover:not(.active) {
+  color: var(--text-1);
+}
+
+/* View panel transitions (same pattern as Analytics) */
+.quiz-answer-panels {
+  display: grid;
+}
+.view-panel {
+  transition: opacity 250ms ease, transform 250ms ease;
+  grid-area: 1 / 1;
+}
+.view-active {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.view-hidden {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
+.quiz-answer-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin-bottom: 12px;
 }
-.quiz-wrong-item {
+.quiz-answer-item {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
 }
-.quiz-wrong-summary {
+.quiz-answer-item--wrong { border-left: 3px solid var(--reset); }
+.quiz-answer-item--correct { border-left: 3px solid var(--done); }
+.quiz-answer-summary {
   display: flex;
   align-items: baseline;
   gap: 10px;
@@ -339,25 +404,25 @@
   font: inherit;
   color: inherit;
 }
-.quiz-wrong-chevron {
+.quiz-answer-chevron {
   margin-left: auto;
   color: var(--text-3);
   font-size: 18px;
   line-height: 1;
   transition: transform 200ms var(--tx-easing-default);
 }
-.quiz-wrong-chevron.is-open { transform: rotate(90deg); }
-.quiz-wrong-prompt {
-  flex: 1;             /* pushes lang-toggle + chevron to the right */
+.quiz-answer-chevron.is-open { transform: rotate(90deg); }
+.quiz-answer-prompt {
+  flex: 1;
   font-weight: 400;
   color: var(--text-2);
   white-space: pre-line;
 }
-.quiz-wrong-body {
+.quiz-answer-body {
   margin-top: 10px;
-  padding: 0 6px 4px;  /* horizontal inset so choices don't hit card edges */
+  padding: 0 6px 4px;
 }
-.quiz-wrong-choices {
+.quiz-answer-choices {
   list-style: none;
   padding: 0;
   display: flex;
@@ -365,7 +430,7 @@
   gap: 4px;
   margin-bottom: 8px;
 }
-.quiz-wrong-choices li {
+.quiz-answer-choices li {
   padding: 6px 10px;
   border-radius: 4px;
   display: flex;
@@ -416,14 +481,14 @@
    uncaught promise rejections on our class names. max-height ceiling
    is generous; longest wrong-answer body in practice is well under
    1000px (4–5 choices + explanation). */
-.quiz-wrong-body-wrap {
+.quiz-answer-body-wrap {
   max-height: 0;
   opacity: 0;
   overflow: hidden;
   transition: max-height 220ms var(--tx-easing-default),
               opacity 200ms var(--tx-easing-default);
 }
-.quiz-wrong-body-wrap.is-open {
+.quiz-answer-body-wrap.is-open {
   max-height: 1200px;
   opacity: 1;
 }

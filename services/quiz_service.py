@@ -443,17 +443,41 @@ async def get_summary(session_id: int) -> dict[str, Any] | None:
         for r in wrong_rows
     ]
 
+    async with db.execute(
+        """SELECT q.id AS question_id, q.prompt_en, q.prompt_th, q.choices_json,
+                  q.correct_labels, q.explanation, a.selected_labels
+             FROM quiz_answers a
+             JOIN questions q ON q.id = a.question_id
+            WHERE a.session_id = ? AND a.is_correct = 1
+            ORDER BY a.id ASC""",
+        (session_id,),
+    ) as cur:
+        correct_rows = await cur.fetchall()
+    correct_answers = [
+        {
+            "question_id":     r["question_id"],
+            "prompt_en":       r["prompt_en"],
+            "prompt_th":       r["prompt_th"],
+            "choices":         json.loads(r["choices_json"]),
+            "correct_labels":  json.loads(r["correct_labels"]),
+            "selected_labels": json.loads(r["selected_labels"]),
+            "explanation":     r["explanation"],
+        }
+        for r in correct_rows
+    ]
+
     return {
-        "session_id":    session_id,
-        "batch_size":    session["batch_size"],
-        "started_at":    session["started_at"],
-        "ended_at":      session["ended_at"],
-        "total_seen":    total,
-        "total_correct": correct,
-        "accuracy":      accuracy,
-        "duration_sec":  duration,
-        "best_streak":   session["best_streak"] or 0,
-        "wrong_answers": wrong_answers,
+        "session_id":      session_id,
+        "batch_size":      session["batch_size"],
+        "started_at":      session["started_at"],
+        "ended_at":        session["ended_at"],
+        "total_seen":      total,
+        "total_correct":   correct,
+        "accuracy":        accuracy,
+        "duration_sec":    duration,
+        "best_streak":     session["best_streak"] or 0,
+        "wrong_answers":   wrong_answers,
+        "correct_answers": correct_answers,
     }
 
 
