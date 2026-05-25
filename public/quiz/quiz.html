@@ -8,7 +8,7 @@
   </div>
 
   <!-- LANDING -->
-  <div x-show="view==='landing' && dashboard"
+  <div x-show="view==='landing' && dashboard">
     <div class="quiz-landing"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
@@ -20,7 +20,7 @@
       <header class="quiz-hero">
         <div class="quiz-hero-left">
           <div class="quiz-hero-stat">
-            <span x-text="String(dashboard.mastered_count).padStart(2,'0')"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="dashboard.quizable_total"></span>
+            <span x-text="String(dashboard?.mastered_count ?? 0).padStart(2,'0')"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="dashboard?.quizable_total ?? ''"></span>
           </div>
           <div class="quiz-hero-rule"></div>
           <div class="quiz-hero-label">Mastered</div>
@@ -28,8 +28,8 @@
         <div class="quiz-hero-right">
           <div class="quiz-hero-percent" x-text="`${masteryPct()}% complete`"></div>
           <div class="quiz-hero-sub">
-            out of <span x-text="dashboard.parsed_total"></span> parsed
-            (<span x-text="dashboard.flagged_count"></span> flagged)
+            out of <span x-text="dashboard?.parsed_total ?? ''"></span> parsed
+            (<span x-text="dashboard?.flagged_count ?? ''"></span> flagged)
           </div>
         </div>
         <div class="progress-track"><div class="progress-fill" :style="`width:${masteryPct()}%`"></div></div>
@@ -53,10 +53,10 @@
       <!-- Recent sessions -->
       <hr class="section-divider">
       <div class="quiz-history">
-        <template x-if="dashboard.recent_sessions.length === 0">
+        <template x-if="dashboard && dashboard.recent_sessions.length === 0">
           <p class="empty-state">No sessions yet.</p>
         </template>
-        <template x-for="s in dashboard.recent_sessions" :key="s.id">
+        <template x-for="s in (dashboard?.recent_sessions || [])" :key="s.id">
           <div class="quiz-history-row" @click="viewSession(s.id)">
             <span class="quiz-history-score" x-text="`${s.total_correct}/${s.total_seen}`"></span>
             <span class="quiz-history-pct"   x-text="`(${s.accuracy}%)`"></span>
@@ -67,9 +67,10 @@
       </div>
 
     </div>
+  </div>
 
   <!-- PRACTICE -->
-  <div x-show="view==='practice' && currentQ" :key="currentQ.question_id"
+  <div x-show="view==='practice' && currentQ">
     <div class="quiz-practice"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
@@ -80,7 +81,7 @@
       <header class="quiz-hero" style="margin-bottom: 24px;">
         <div class="quiz-hero-left">
           <div class="quiz-hero-stat">
-            <span x-text="String(currentQ.position.seen + 1).padStart(2,'0')"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="currentQ.position.total !== null ? currentQ.position.total : '∞'"></span>
+            <span x-text="String((currentQ?.position?.seen ?? 0) + 1).padStart(2,'0')"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="currentQ?.position?.total != null ? currentQ.position.total : '∞'"></span>
           </div>
           <div class="quiz-hero-rule"></div>
           <div class="quiz-hero-label">Question</div>
@@ -94,23 +95,23 @@
 
       <div class="quiz-question" x-data="{ showTh: false }" x-init="$watch('currentQ', () => showTh = false)">
         <div class="quiz-prompt-row">
-          <div class="quiz-prompt-en" x-show="!showTh" x-text="currentQ.prompt_en"></div>
-          <div class="quiz-prompt-th" x-cloak x-show="showTh && currentQ.prompt_th" x-text="currentQ.prompt_th"></div>
+          <div class="quiz-prompt-en" x-show="!showTh" x-text="currentQ?.prompt_en ?? ''"></div>
+          <div class="quiz-prompt-th" x-cloak x-show="showTh && currentQ?.prompt_th" x-text="currentQ?.prompt_th ?? ''"></div>
           <button class="btn-brief quiz-lang-toggle"
-                  x-show="currentQ.prompt_th"
+                  x-show="currentQ?.prompt_th"
                   @click="showTh = !showTh"
                   x-text="showTh ? 'EN' : 'TH'"></button>
         </div>
         <div class="quiz-q-meta">
-          <span x-text="`Q #${currentQ.question_id}`"></span>
-          <span x-show="currentQ.current_streak > 0"
-                x-text="`· streak ${currentQ.current_streak}`"></span>
-          <span class="quiz-q-status" x-show="feedback"
+          <span x-text="currentQ ? `Q #${currentQ.question_id}` : ''"></span>
+          <span x-show="currentQ && currentQ.current_streak > 0"
+                x-text="currentQ ? `· streak ${currentQ.current_streak}` : ''"></span>
+          <span class="quiz-q-status" x-show="feedback && currentQ"
                 :class="feedback && feedback.is_correct ? 'quiz-q-status--correct' : 'quiz-q-status--wrong'"
-                x-text="feedback && feedback.is_correct ? `✓ answered in ${lastQSec}s · streak ${currentQ.current_streak + 1}` : `✗ answered in ${lastQSec}s`"></span>
+                x-text="feedback && currentQ ? (feedback.is_correct ? `✓ answered in ${lastQSec}s · streak ${currentQ.current_streak + 1}` : `✗ answered in ${lastQSec}s`) : ''"></span>
         </div>
 
-        <template x-if="currentQ.image_urls && currentQ.image_urls.length">
+        <template x-if="currentQ && currentQ.image_urls && currentQ.image_urls.length">
           <div class="quiz-images">
             <template x-for="url in currentQ.image_urls" :key="url">
               <img class="quiz-image" :src="url" alt="" @click="$store.imageModal.show(url)">
@@ -119,7 +120,7 @@
         </template>
 
         <div class="quiz-choices">
-          <template x-for="choice in currentQ.choices" :key="choice.label">
+          <template x-for="choice in (currentQ?.choices || [])" :key="choice.label">
             <button class="quiz-choice"
                     :class="{
                       'quiz-choice--selected': isSelected(choice.label) && !feedback,
@@ -156,13 +157,10 @@
         </div>
       </div>
     </div>
+  </div>
 
   <!-- SUMMARY -->
-<<<<<<< HEAD
-  <template x-show="view==='summary' && 'finalSummary'">
-=======
-  <div x-show="view==='summary' && finalSummary"
->>>>>>> 7a890a4 (fix(quiz): remove Practice again button, change x-if to x-show for smooth transitions)
+  <div x-show="view==='summary' && finalSummary">
     <div class="quiz-summary"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
@@ -173,31 +171,31 @@
       <header class="quiz-hero" style="margin-bottom: 24px;">
         <div class="quiz-hero-left">
           <div class="quiz-hero-stat">
-            <span x-text="finalSummary.total_correct"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="finalSummary.total_seen"></span>
+            <span x-text="finalSummary?.total_correct ?? ''"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="finalSummary?.total_seen ?? ''"></span>
           </div>
           <div class="quiz-hero-rule"></div>
           <div class="quiz-hero-label">Score</div>
         </div>
         <div class="quiz-hero-right">
-          <div class="quiz-hero-percent" x-text="`${finalSummary.accuracy}% accuracy`"></div>
-          <div class="quiz-hero-sub" x-text="`Duration: ${formatDur(finalSummary.duration_sec)}`"></div>
+          <div class="quiz-hero-percent" x-text="finalSummary ? `${finalSummary.accuracy}% accuracy` : ''"></div>
+          <div class="quiz-hero-sub" x-text="finalSummary ? `Duration: ${formatDur(finalSummary.duration_sec)}` : ''"></div>
         </div>
-        <div class="progress-track"><div class="progress-fill" :style="`width:${finalSummary.accuracy}%`"></div></div>
+        <div class="progress-track"><div class="progress-fill" :style="`width:${finalSummary?.accuracy ?? 0}%`"></div></div>
       </header>
 
       <!-- Toggle: Wrong / Correct -->
       <div class="quiz-summary-header">
         <button class="quiz-exit-btn" @click="backToLanding()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Back to landing</button>
         <div class="quiz-summary-toggle">
-          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${finalSummary.wrong_answers ? finalSummary.wrong_answers.length : 0})`"></button>
-          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${finalSummary.correct_answers ? finalSummary.correct_answers.length : 0})`"></button>
+          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${finalSummary?.wrong_answers ? finalSummary.wrong_answers.length : 0})`"></button>
+          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${finalSummary?.correct_answers ? finalSummary.correct_answers.length : 0})`"></button>
         </div>
       </div>
 
       <div class="quiz-answer-panels">
         <!-- Wrong answers panel -->
         <div class="view-panel" :class="summaryView==='wrong' ? 'view-active' : 'view-hidden'">
-          <template x-if="finalSummary.wrong_answers && finalSummary.wrong_answers.length > 0">
+          <template x-if="finalSummary && finalSummary.wrong_answers && finalSummary.wrong_answers.length > 0">
             <div class="quiz-answer-list">
               <template x-for="w in finalSummary.wrong_answers" :key="w.question_id">
                 <div class="quiz-answer-item quiz-answer-item--wrong" x-data="{ open: false, showTh: false }">
@@ -238,14 +236,14 @@
               </template>
             </div>
           </template>
-          <template x-if="!finalSummary.wrong_answers || finalSummary.wrong_answers.length === 0">
+          <template x-if="finalSummary && (!finalSummary.wrong_answers || finalSummary.wrong_answers.length === 0)">
             <p class="empty-state">No wrong answers — great job!</p>
           </template>
         </div>
 
         <!-- Correct answers panel -->
         <div class="view-panel" :class="summaryView==='correct' ? 'view-active' : 'view-hidden'">
-          <template x-if="finalSummary.correct_answers && finalSummary.correct_answers.length > 0">
+          <template x-if="finalSummary && finalSummary.correct_answers && finalSummary.correct_answers.length > 0">
             <div class="quiz-answer-list">
               <template x-for="c in finalSummary.correct_answers" :key="c.question_id">
                 <div class="quiz-answer-item quiz-answer-item--correct" x-data="{ open: false, showTh: false }">
@@ -286,24 +284,17 @@
               </template>
             </div>
           </template>
-          <template x-if="!finalSummary.correct_answers || finalSummary.correct_answers.length === 0">
+          <template x-if="finalSummary && (!finalSummary.correct_answers || finalSummary.correct_answers.length === 0)">
             <p class="empty-state">No correct answers yet.</p>
           </template>
         </div>
       </div>
-<<<<<<< HEAD
     </div>
-  </ะ>
+  </div>
 
   <!-- REVIEW (past session) -->
-  <template x-if="view==='review' && 'reviewSummary'">
-=======
-
-  <!-- REVIEW (past session) -->
-  <div x-show="view==='review' && reviewSummary"
->>>>>>> 7a890a4 (fix(quiz): remove Practice again button, change x-if to x-show for smooth transitions)
+  <div x-show="view==='review' && reviewSummary">
     <div class="quiz-summary"
-         x-show="view==='review' && 'reviewSummary'"
          x-transition:enter="quiz-view-enter"
          x-transition:enter-start="quiz-view-enter-start"
          x-transition:enter-end="quiz-view-enter-end"
@@ -313,31 +304,31 @@
       <header class="quiz-hero" style="margin-bottom: 24px;">
         <div class="quiz-hero-left">
           <div class="quiz-hero-stat">
-            <span x-text="reviewSummary.total_correct"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="reviewSummary.total_seen"></span>
+            <span x-text="reviewSummary?.total_correct ?? ''"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="reviewSummary?.total_seen ?? ''"></span>
           </div>
           <div class="quiz-hero-rule"></div>
           <div class="quiz-hero-label">Score</div>
         </div>
         <div class="quiz-hero-right">
-          <div class="quiz-hero-percent" x-text="`${reviewSummary.accuracy}% accuracy`"></div>
-          <div class="quiz-hero-sub" x-text="`Duration: ${formatDur(reviewSummary.duration_sec)}`"></div>
+          <div class="quiz-hero-percent" x-text="reviewSummary ? `${reviewSummary.accuracy}% accuracy` : ''"></div>
+          <div class="quiz-hero-sub" x-text="reviewSummary ? `Duration: ${formatDur(reviewSummary.duration_sec)}` : ''"></div>
         </div>
-        <div class="progress-track"><div class="progress-fill" :style="`width:${reviewSummary.accuracy}%`"></div></div>
+        <div class="progress-track"><div class="progress-fill" :style="`width:${reviewSummary?.accuracy ?? 0}%`"></div></div>
       </header>
 
       <!-- Toggle: Wrong / Correct -->
       <div class="quiz-summary-header">
         <button class="quiz-exit-btn" @click="backToLanding()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> Back to landing</button>
         <div class="quiz-summary-toggle">
-          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${reviewSummary.wrong_answers ? reviewSummary.wrong_answers.length : 0})`"></button>
-          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${reviewSummary.correct_answers ? reviewSummary.correct_answers.length : 0})`"></button>
+          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='wrong'}" @click="summaryView='wrong'" x-text="`Wrong (${reviewSummary?.wrong_answers ? reviewSummary.wrong_answers.length : 0})`"></button>
+          <button class="quiz-summary-toggle-btn" :class="{active: summaryView==='correct'}" @click="summaryView='correct'" x-text="`Correct (${reviewSummary?.correct_answers ? reviewSummary.correct_answers.length : 0})`"></button>
         </div>
       </div>
 
       <div class="quiz-answer-panels">
         <!-- Wrong answers panel -->
         <div class="view-panel" :class="summaryView==='wrong' ? 'view-active' : 'view-hidden'">
-          <template x-if="reviewSummary.wrong_answers && reviewSummary.wrong_answers.length > 0">
+          <template x-if="reviewSummary && reviewSummary.wrong_answers && reviewSummary.wrong_answers.length > 0">
             <div class="quiz-answer-list">
               <template x-for="w in reviewSummary.wrong_answers" :key="w.question_id">
                 <div class="quiz-answer-item quiz-answer-item--wrong" x-data="{ open: false, showTh: false }">
@@ -378,14 +369,14 @@
               </template>
             </div>
           </template>
-          <template x-if="!reviewSummary.wrong_answers || reviewSummary.wrong_answers.length === 0">
+          <template x-if="reviewSummary && (!reviewSummary.wrong_answers || reviewSummary.wrong_answers.length === 0)">
             <p class="empty-state">No wrong answers — great job!</p>
           </template>
         </div>
 
         <!-- Correct answers panel -->
         <div class="view-panel" :class="summaryView==='correct' ? 'view-active' : 'view-hidden'">
-          <template x-if="reviewSummary.correct_answers && reviewSummary.correct_answers.length > 0">
+          <template x-if="reviewSummary && reviewSummary.correct_answers && reviewSummary.correct_answers.length > 0">
             <div class="quiz-answer-list">
               <template x-for="c in reviewSummary.correct_answers" :key="c.question_id">
                 <div class="quiz-answer-item quiz-answer-item--correct" x-data="{ open: false, showTh: false }">
@@ -426,11 +417,11 @@
               </template>
             </div>
           </template>
-          <template x-if="!reviewSummary.correct_answers || reviewSummary.correct_answers.length === 0">
+          <template x-if="reviewSummary && (!reviewSummary.correct_answers || reviewSummary.correct_answers.length === 0)">
             <p class="empty-state">No correct answers.</p>
           </template>
         </div>
       </div>
     </div>
-  </tem>
+  </div>
 </div>
