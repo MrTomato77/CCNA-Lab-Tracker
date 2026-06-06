@@ -9,19 +9,18 @@
     <template x-if="!loading">
       <div>
         <!-- Hero -->
-        <header class="hero">
-          <div class="hero-left">
-            <div class="hero-stat">
-              <span x-text="String(summary.done).padStart(2,'0')"></span><span class="hero-slash"> / </span><span class="hero-total" x-text="summary.total"></span>
+        <header class="stat-hero">
+          <div class="stat-hero-left">
+            <div class="stat-hero-figure">
+              <span x-text="String(summary.done).padStart(2,'0')"></span><span class="stat-hero-slash"> / </span><span class="stat-hero-total" x-text="summary.total"></span>
             </div>
-            <div class="hero-rule"></div>
-            <div class="hero-label">Completed</div>
+            <div class="stat-hero-label">Labs completed</div>
           </div>
-          <div class="hero-right">
-            <div class="hero-percent" x-text="`${summary.completion_percent}% complete`"></div>
-            <div class="hero-elapsed">⏱ <span x-text="formatTotalTime(summary.total_time_spent) + ' elapsed'"></span></div>
+          <div class="stat-hero-right">
+            <div class="stat-hero-headline" x-text="`${summary.completion_percent}% complete`"></div>
+            <div class="stat-hero-sub stat-hero-sub--mono" x-text="formatTotalTime(summary.total_time_spent) + ' elapsed'"></div>
           </div>
-          <div class="progress-track"><div class="progress-fill" :style="`width:${summary.completion_percent}%`"></div></div>
+          <div class="progress-track"><div class="progress-fill" :style="`transform:scaleX(${summary.completion_percent / 100})`"></div></div>
         </header>
 
         <!-- Filter chips -->
@@ -92,7 +91,7 @@
               <!-- Col 2: reset (left) + timer (right), reset only when done -->
               <div class="lab-col-timer">
                 <button class="btn-card-reset" @click="resetLab()" title="Reset this lab"
-                  x-show="lab.status === 'done'">↻</button>
+                  x-show="lab.status !== 'not_started' && !running">↻</button>
                 <div class="lab-timer" x-text="formatTime(elapsed || lab.time_spent || 0)"></div>
               </div>
               <!-- Col 3: secondary actions on the left, primary CTA (Launch)
@@ -117,7 +116,7 @@
                   :disabled="!running && !lab.file_path"
                   :title="running ? 'Stop timer' : lab.file_path ? 'Open in Packet Tracer' : 'Import this lab first'"
                   @click="running ? stopTimer() : launch()"
-                  x-text="running ? 'Stop ■' : lab.status === 'done' ? 'Done ✓' : lab.file_path ? 'Launch →' : '— —'">
+                  x-text="running ? 'Stop ■' : lab.status === 'done' ? 'Done ✓' : lab.file_path ? 'Launch →' : 'Not imported'">
                 </button>
               </div>
             </article>
@@ -125,6 +124,13 @@
           </div>
         </template>
         </div>
+
+        <!-- Empty state: filter excludes every lab -->
+        <p class="empty-state" style="text-align:center; padding:48px 0;"
+           x-show="labs.filter(l => matchesFilter(l)).length === 0">
+          No labs match this filter.
+          <button class="quiz-finish-link" @click="setFilter(() => { filterCat=''; hideStatus=''; })">Clear filters</button>
+        </p>
       </div>
     </template>
   </div>

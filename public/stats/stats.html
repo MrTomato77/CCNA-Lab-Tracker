@@ -21,22 +21,18 @@
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-num" x-text="summary.done"></div>
-            <div class="stat-rule"></div>
             <div class="stat-label">Done</div>
           </div>
           <div class="stat-card">
             <div class="stat-num" x-text="summary.in_progress"></div>
-            <div class="stat-rule"></div>
             <div class="stat-label">In Progress</div>
           </div>
           <div class="stat-card">
             <div class="stat-num" x-text="summary.not_started"></div>
-            <div class="stat-rule"></div>
             <div class="stat-label">Not Started</div>
           </div>
           <div class="stat-card">
             <div class="stat-num stat-num--time" x-html="formatTimeRich(summary.total_time_spent)"></div>
-            <div class="stat-rule"></div>
             <div class="stat-label">Total Time</div>
           </div>
         </div>
@@ -53,7 +49,7 @@
               <div class="cat-row">
                 <span class="cat-name" x-text="cat.category"></span>
                 <div class="cat-track">
-                  <div class="cat-fill" :style="`width:${cat.total>0?(cat.done/cat.total)*100:0}%`"></div>
+                  <div class="cat-fill" :style="`transform:scaleX(${cat.total>0?(cat.done/cat.total):0})`"></div>
                 </div>
                 <span class="cat-count" x-text="`${cat.done} / ${cat.total}`"></span>
               </div>
@@ -67,22 +63,18 @@
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-num" x-text="quizSummary.mastered_count"></div>
-            <div class="stat-rule"></div>
             <div class="stat-label">Mastered</div>
           </div>
           <div class="stat-card">
             <div class="stat-num" x-text="quizSummary.quizable_total"></div>
-            <div class="stat-rule"></div>
-            <div class="stat-label">Quizable</div>
+            <div class="stat-label">In Pool</div>
           </div>
           <div class="stat-card">
             <div class="stat-num" x-text="quizSummary.avg_accuracy"></div>
-            <div class="stat-rule"></div>
             <div class="stat-label">Avg Accuracy</div>
           </div>
           <div class="stat-card">
             <div class="stat-num" x-text="quizSummary.total_sessions"></div>
-            <div class="stat-rule"></div>
             <div class="stat-label">Sessions</div>
           </div>
         </div>

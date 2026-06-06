@@ -133,7 +133,7 @@ window.labCard = function(initialLab) {
     },
 
     openBrief() {
-      Alpine.store("summaryModal").show(this.lab);
+      Alpine.store("summaryModal").show(this.lab, this.running);
     },
 
     async launch() {
@@ -142,7 +142,7 @@ window.labCard = function(initialLab) {
         return;
       }
       if (!this.lab.file_path) {
-        window.showToast("! Import this lab first. Go to Import page.", 'error');
+        window.showToast("This lab hasn't been imported yet.", 'error');
         return;
       }
       try {

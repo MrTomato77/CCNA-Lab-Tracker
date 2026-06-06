@@ -31,6 +31,11 @@
 
   --reset:                  #b03838;
   --reset-tint:             #f8dcdc;
+  --reset-border:           #e6b3b3;
+
+  /* Danger == reset hue; aliased so semantic intent reads clearly in settings. */
+  --danger:                 #b03838;
+  --danger-tint:            #f8dcdc;
 
   --shadow-sm: 0 1px 2px rgba(20,24,40,0.04), 0 1px 3px rgba(20,24,40,0.04);
   --shadow:    0 4px 12px rgba(20,24,40,0.06);
@@ -69,6 +74,10 @@
 
   --reset:                  #e07878;
   --reset-tint:             #3a1818;
+  --reset-border:           #5a2c2c;
+
+  --danger:                 #e07878;
+  --danger-tint:            #3a1818;
 
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
   --shadow:    0 4px 12px rgba(0,0,0,0.35);

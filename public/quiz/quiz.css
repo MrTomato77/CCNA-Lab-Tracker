@@ -7,74 +7,30 @@
   flex-direction: column;
 }
 
-/* Quiz Hero */
-.quiz-hero {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 24px;
-  align-items: flex-end;
-  padding: 16px 0 28px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
-}
-.quiz-hero-left { display: flex; flex-direction: column; gap: 10px; }
-.quiz-hero-stat {
-  font-size: 56px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  color: var(--text);
-  line-height: 1;
-}
-.quiz-hero-slash, .quiz-hero-total { color: var(--text-3); font-weight: 400; }
-.quiz-hero-rule {
-  width: 28px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 2px;
-}
-.quiz-hero-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--text-3);
-}
-.quiz-hero-right {
+/* Page lead uses the shared .stat-hero component (core/components.css). */
+
+/* Landing empty / celebration states */
+.quiz-empty {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
   gap: 8px;
+  align-items: center;
+  text-align: center;
+  padding: 56px 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
 }
-.quiz-hero-percent {
-  font-size: 24px;
+.quiz-empty-title {
+  font-size: 17px;
   font-weight: 600;
   color: var(--text);
 }
-.quiz-hero-sub {
+.quiz-empty-text {
   font-size: 13px;
-  color: var(--text-3);
-}
-
-/* Stat pills */
-.quiz-stat-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.quiz-pill {
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 500;
   color: var(--text-2);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-}
-.quiz-pill-value {
-  font-weight: 600;
-  font-family: 'JetBrains Mono', monospace;
-  color: var(--text-1);
-  margin-left: 4px;
+  max-width: 46ch;
+  line-height: 1.6;
 }
 
 .quiz-batch-grid {
@@ -93,7 +49,7 @@
   border-radius: 12px;
   cursor: pointer;
   font-family: inherit;
-  color: var(--text-1);
+  color: var(--text);
 }
 .quiz-batch-card:hover:not(:disabled) {
   transform: translateY(-2px);
@@ -117,6 +73,25 @@
   flex-direction: column;
   gap: 12px;
 }
+.quiz-history-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.quiz-history-legend {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+}
+@media (max-width: 560px) {
+  .quiz-history-legend { display: none; }
+}
 .quiz-history-row {
   display: flex;
   align-items: baseline;
@@ -138,7 +113,7 @@
   color: var(--text-3);
   font-size: 14px;
 }
-.quiz-history-score { font-weight: 600; color: var(--text-1); }
+.quiz-history-score { font-weight: 600; color: var(--text); }
 .quiz-history-pct   { color: var(--accent); }
 .quiz-history-meta  { color: var(--text-3); font-size: 13px; }
 
@@ -213,14 +188,14 @@
 .quiz-prompt-en {
   font-size: 18px;
   font-weight: 500;
-  color: var(--text-1);
+  color: var(--text);
   line-height: 1.5;
   white-space: pre-line;
 }
 .quiz-prompt-th {
   font-size: 18px;
   font-weight: 500;
-  color: var(--text-1);
+  color: var(--text);
   line-height: 1.5;
   white-space: pre-line;
 }
@@ -269,7 +244,7 @@
   cursor: pointer;
   text-align: left;
   font-family: inherit;
-  color: var(--text-1);
+  color: var(--text);
 }
 .quiz-choice:hover:not(:disabled) { border-color: var(--accent); }
 .quiz-choice:disabled             { cursor: default; }
@@ -316,9 +291,37 @@
 
 .quiz-actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 12px;
   padding-top: 4px;
+}
+
+/* Keyboard hint sits at the left of the action row, buttons stay right. */
+.quiz-kbd-hint {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.quiz-kbd-hint kbd {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border: 1px solid var(--border-2);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+@media (max-width: 720px) {
+  .quiz-kbd-hint { display: none; }
+}
+
+/* Summary footer: the "practice again" call to action. */
+.quiz-summary-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
 }
 
 /* Summary answer toggle */
@@ -355,7 +358,7 @@
   color: #fff;
 }
 .quiz-summary-toggle-btn:hover:not(.active) {
-  color: var(--text-1);
+  color: var(--text);
 }
 
 /* Exit icon button */
@@ -374,7 +377,7 @@
 }
 .quiz-exit-btn:hover {
   background: var(--surface-2);
-  color: var(--text-1);
+  color: var(--text);
   border-color: var(--text-3);
 }
 
@@ -413,8 +416,8 @@
   border-radius: 8px;
   padding: 10px 14px;
 }
-.quiz-answer-item--wrong { border-left: 3px solid var(--reset); }
-.quiz-answer-item--correct { border-left: 3px solid var(--done); }
+.quiz-answer-item--wrong   { border-color: var(--reset-border); background: var(--reset-tint); }
+.quiz-answer-item--correct { border-color: var(--done-border);  background: var(--surface-tint-done); }
 .quiz-answer-summary {
   display: flex;
   align-items: center;
@@ -473,9 +476,6 @@
 
 @media (max-width: 720px) {
   .quiz-batch-grid    { grid-template-columns: repeat(2, 1fr); }
-  .quiz-hero          { grid-template-columns: 1fr; }
-  .quiz-hero-right    { align-items: flex-start; }
-  .quiz-hero-stat     { font-size: 44px; }
   .quiz-prompt-en     { font-size: 16px; }
   .quiz-choice        { padding: 12px 14px; }
   .quiz-actions       { flex-direction: column-reverse; }
@@ -526,21 +526,24 @@
 }
 
 /* Collapse animation for summary wrong-answer body.
-   Wrapper transitions max-height 0 → 1200px + opacity 0 → 1 when
-   .is-open is set by Alpine. Used a class-toggle pattern (not Alpine
-   x-transition) because Alpine's enter/leave class machinery threw
-   uncaught promise rejections on our class names. max-height ceiling
-   is generous; longest wrong-answer body in practice is well under
-   1000px (4–5 choices + explanation). */
+   Uses the grid-template-rows 0fr → 1fr technique instead of animating
+   max-height: it transitions a single layout-driven value to the content's
+   exact height (no magic ceiling) and stays on the compositor-friendly path.
+   Class-toggle (not Alpine x-transition) because Alpine's enter/leave class
+   machinery threw uncaught promise rejections on our class names. */
 .quiz-answer-body-wrap {
-  max-height: 0;
+  display: grid;
+  grid-template-rows: 0fr;
   opacity: 0;
-  overflow: hidden;
-  transition: max-height 220ms var(--tx-easing-default),
+  transition: grid-template-rows 220ms var(--tx-easing-default),
               opacity 200ms var(--tx-easing-default);
 }
+.quiz-answer-body-wrap > .quiz-answer-body {
+  overflow: hidden;
+  min-height: 0;
+}
 .quiz-answer-body-wrap.is-open {
-  max-height: 1200px;
+  grid-template-rows: 1fr;
   opacity: 1;
 }
 
@@ -561,7 +564,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .quiz-view-enter, .quiz-question,
-  .quiz-wrong-body-wrap, .quiz-wrong-chevron,
+  .quiz-answer-body-wrap, .quiz-answer-chevron,
   .quiz-choice--correct, .quiz-choice--wrong {
     transition: none;
     animation: none;

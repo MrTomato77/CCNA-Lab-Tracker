@@ -33,6 +33,62 @@
 [data-theme="dark"] .btn-primary--ghost { color: var(--accent); }
 [data-theme="dark"] .btn-primary--ghost:hover { color: var(--bg); }
 
+/* ── Stat hero ────────────────────────────────────────────────────────────
+   Shared page-lead block: a large figure (done / total) on the left, a
+   headline + sub on the right, a progress track spanning the full width.
+   Used by Practical, Quiz landing, Quiz practice, and Quiz summary so the
+   pattern lives in one place instead of being copied per page. */
+
+.stat-hero {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: flex-end;
+  padding: 16px 0 28px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+.stat-hero-left { display: flex; flex-direction: column; gap: 8px; }
+.stat-hero-figure {
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  line-height: 1;
+}
+.stat-hero-slash, .stat-hero-total { color: var(--text-3); font-weight: 400; }
+.stat-hero-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+}
+.stat-hero-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.stat-hero-headline {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text);
+}
+.stat-hero-sub {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.stat-hero-sub--mono {
+  font-family: var(--font-mono);
+}
+
+@media (max-width: 960px) {
+  .stat-hero       { grid-template-columns: 1fr; }
+  .stat-hero-right { align-items: flex-start; }
+  .stat-hero-figure { font-size: 44px; }
+}
+
 /* ── Loading + spinner ────────────────────────────────────────────────── */
 
 .loading {
@@ -63,10 +119,12 @@
   z-index: 2000;
   min-width: 240px;
   max-width: 380px;
-  padding: 12px 18px 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
   background: var(--surface);
-  border: 1px solid var(--border-2);
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--accent);
   border-radius: var(--radius);
   color: var(--text);
   font-size: 13px;
@@ -74,8 +132,18 @@
   box-shadow: var(--shadow-lg);
   animation: toastIn 220ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
-.toast--success { border-left-color: var(--done); }
-.toast--error   { border-left-color: var(--reset); }
+/* Leading status dot replaces the left accent stripe. */
+.toast::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.toast--success { border-color: var(--done); }
+.toast--success::before { background: var(--done); }
+.toast--error   { border-color: var(--reset); }
+.toast--error::before   { background: var(--reset); }
 
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(8px); }
@@ -124,10 +192,30 @@
   line-height: 1.6;
   margin-bottom: 24px;
 }
+.modal-confirm-input {
+  display: block;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 9px 12px;
+  font-size: 14px;
+  background: var(--bg);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  color: var(--text);
+}
+.modal-confirm-input:focus {
+  outline: none;
+  border-color: var(--reset);
+  box-shadow: 0 0 0 3px var(--reset-tint);
+}
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+}
+.modal-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .modal-btn {
   padding: 8px 22px;

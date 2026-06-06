@@ -35,6 +35,29 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+.brief-timer-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--in-progress);
+}
+.brief-timer-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--in-progress);
+  animation: briefTimerPulse 1.6s ease-in-out infinite;
+}
+@keyframes briefTimerPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brief-timer-dot { animation: none; }
+}
 .summary-body {
   max-height: 60vh;
   overflow-y: auto;

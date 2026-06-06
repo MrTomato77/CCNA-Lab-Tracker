@@ -5,9 +5,17 @@
     <div class="modal" @click.stop>
       <div class="modal-title" x-show="$store.modal.title" x-text="$store.modal.title"></div>
       <p class="modal-message" x-text="$store.modal.message"></p>
+      <template x-if="$store.modal.confirmWord">
+        <input class="modal-confirm-input" type="text"
+          x-model="$store.modal.typed"
+          :placeholder="`Type ${$store.modal.confirmWord} to confirm`"
+          @keydown.enter="$store.modal.ok()"
+          x-effect="$store.modal.open && $store.modal.confirmWord && $nextTick(() => $el.focus())">
+      </template>
       <div class="modal-actions">
         <button class="modal-btn modal-btn--cancel" @click="$store.modal.cancel()">Cancel</button>
         <button class="modal-btn modal-btn--ok" :class="{ 'modal-btn--danger': $store.modal.danger }"
+          :disabled="!$store.modal.canConfirm()"
           @click="$store.modal.ok()">Confirm</button>
       </div>
     </div>
@@ -24,6 +32,10 @@
         <span x-text="$store.summaryModal.lab?.id"></span>
         ·
         <span x-text="$store.summaryModal.lab?.name"></span>
+      </div>
+      <div class="brief-timer-note" x-show="$store.summaryModal.timerRunning" x-cloak>
+        <span class="brief-timer-dot" aria-hidden="true"></span>
+        Timer is still running for this lab
       </div>
 
       <template x-if="$store.summaryModal.loading">

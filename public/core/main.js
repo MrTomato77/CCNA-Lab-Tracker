@@ -172,15 +172,20 @@ document.addEventListener("alpine:init", () => {
 
   Alpine.store("modal", {
     open: false, title: "", message: "", danger: false, resolve: null,
-    show(message, title = "", danger = false) {
+    // When confirmWord is set, Confirm stays disabled until the user types it.
+    // Reserved for irreversible actions (bulk resets).
+    confirmWord: null, typed: "",
+    show(message, title = "", danger = false, confirmWord = null) {
       return new Promise(resolve => {
         this.title = title; this.message = message;
         this.danger = danger; this.resolve = resolve;
+        this.confirmWord = confirmWord; this.typed = "";
         this.open = true;
       });
     },
-    ok()     { if (this.resolve) this.resolve(true);  this.open = false; },
-    cancel() { if (this.resolve) this.resolve(false); this.open = false; }
+    canConfirm() { return !this.confirmWord || this.typed.trim() === this.confirmWord; },
+    ok()     { if (!this.canConfirm()) return; if (this.resolve) this.resolve(true); this.open = false; this.typed = ""; },
+    cancel() { if (this.resolve) this.resolve(false); this.open = false; this.typed = ""; }
   });
 
   Alpine.store("summaryModal", {
@@ -189,8 +194,10 @@ document.addEventListener("alpine:init", () => {
     data: null,
     loading: false,
     error: null,
-    async show(lab) {
+    timerRunning: false,
+    async show(lab, timerRunning = false) {
       this.lab = { id: lab.id, name: lab.name };
+      this.timerRunning = timerRunning;
       this.data = null;
       this.error = null;
       this.loading = true;
@@ -220,6 +227,22 @@ document.addEventListener("alpine:init", () => {
     close()   { this.open = false; this.url = null; },
   });
 });
+
+// ── Error messaging ───────────────────────────────────────────────────
+// Maps an api() envelope to a human-readable line. The toast's coloured dot
+// already signals severity, so messages stay glyph-free and plain.
+window.netErrMsg = "Can't reach the server. Check that it's running.";
+window.friendlyError = function(json, fallback = "Something went wrong. Try again.") {
+  if (!json) return fallback;
+  const byCode = {
+    NON_JSON_RESPONSE: "The server returned an unexpected response. Try again.",
+    BAD_JSON:          "The server response was malformed. Try again.",
+  };
+  if (json.code && byCode[json.code]) return byCode[json.code];
+  if (json.status === 404) return "That item no longer exists.";
+  if (json.status >= 500)  return "Server error. Try again in a moment.";
+  return json.error || fallback;
+};
 
 // ── Toast Service ─────────────────────────────────────────────────────
 window.showToast = function(message, type = 'info', duration = 1800) {

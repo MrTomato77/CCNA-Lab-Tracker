@@ -20,6 +20,7 @@ window.quizPage = function() {
     selection: [],
     feedback: null,
     submitting: false,
+    loadingNext: false,      // in-session fetch; keeps the question on screen
     finalSummary: null,
     reviewSummary: null,
     summaryView: 'wrong',
@@ -34,6 +35,41 @@ window.quizPage = function() {
       await this.loadDashboard();
     },
 
+    // Keyboard accelerators. Bound via @keydown.window on the quiz root; we
+    // bail unless the quiz page is actually on screen so shortcuts don't fire
+    // from other tabs. Ignores keystrokes aimed at inputs and open modals.
+    onKey(e) {
+      if (this.$el.offsetParent === null) return;              // quiz page hidden
+      if (e.target.matches("input, textarea, select")) return;
+      if (this.$store.modal.open || this.$store.imageModal.open) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (this.view === "practice" && this.currentQ) {
+        const choices = this.currentQ.choices || [];
+        if (/^[1-9]$/.test(e.key)) {
+          const idx = parseInt(e.key, 10) - 1;
+          if (idx < choices.length && !this.feedback) {
+            this.toggleChoice(choices[idx].label);
+            e.preventDefault();
+          }
+          return;
+        }
+        if (e.key === "Enter") {
+          if (this.feedback) { if (!this.loadingNext) this.fetchNext(); }
+          else if (this.selection.length && !this.submitting) this.submit();
+          e.preventDefault();
+        }
+      } else if (this.view === "landing") {
+        const idx = { "1": 0, "2": 1, "3": 2, "4": 3, "5": 4 }[e.key];
+        if (idx === undefined) return;
+        const size = this.BATCH_SIZES[idx];
+        if (size && this.canStart(size.value)) {
+          this.startSession(size.value);
+          e.preventDefault();
+        }
+      }
+    },
+
     async loadDashboard() {
       this.view = "loading";
       try {
@@ -41,11 +77,11 @@ window.quizPage = function() {
         if (json.success) {
           this.dashboard = json.data;
         } else {
-          window.showToast("× " + (json.error || "Failed to load"), "error");
+          window.showToast(window.friendlyError(json, "Failed to load quiz dashboard."), "error");
           this.dashboard = null;
         }
       } catch (e) {
-        window.showToast("× Network error", "error");
+        window.showToast(window.netErrMsg, "error");
         this.dashboard = null;
       } finally {
         this.view = "landing";
@@ -113,7 +149,7 @@ window.quizPage = function() {
         const json = await api("/api/quiz/sessions",
           { method: "POST", body: { batch_size: batchSize } });
         if (!json.success) {
-          window.showToast("× " + json.error, "error");
+          window.showToast(window.friendlyError(json), "error");
           this.view = "landing";
           return;
         }
@@ -123,7 +159,7 @@ window.quizPage = function() {
         this._startTimer();
         await this.fetchNext();
       } catch (e) {
-        window.showToast("× Network error", "error");
+        window.showToast(window.netErrMsg, "error");
         this.view = "landing";
       }
     },
@@ -146,13 +182,18 @@ window.quizPage = function() {
     },
 
     async fetchNext() {
-      this.view = "loading";
+      // First question of a session shows the full loading view; subsequent
+      // fetches keep the current question on screen and flag loadingNext so
+      // the Next button shows progress instead of the whole view flashing.
+      const inSession = this.view === "practice";
+      if (inSession) this.loadingNext = true;
+      else this.view = "loading";
       this.selection = [];
       this.feedback = null;
       try {
         const json = await api(`/api/quiz/sessions/${this.sessionId}/next`);
         if (!json.success) {
-          window.showToast("× " + json.error, "error");
+          window.showToast(window.friendlyError(json), "error");
           this._stopTimer();
           this.view = "landing";
           return;
@@ -166,9 +207,11 @@ window.quizPage = function() {
         this.view = "practice";
       } catch (e) {
         // Stop timer on network error to avoid phantom clock
-        window.showToast("× Network error", "error");
+        window.showToast(window.netErrMsg, "error");
         this._stopTimer();
         this.view = "landing";
+      } finally {
+        this.loadingNext = false;
       }
     },
 
@@ -203,12 +246,12 @@ window.quizPage = function() {
             await this.fetchNext();
             return;
           }
-          window.showToast("× " + json.error, "error");
+          window.showToast(window.friendlyError(json), "error");
           return;
         }
         this.feedback = json.data;
       } catch (e) {
-        window.showToast("× Network error", "error");
+        window.showToast(window.netErrMsg, "error");
       } finally {
         this.submitting = false;
       }
@@ -226,12 +269,12 @@ window.quizPage = function() {
             await this.fetchNext();
             return;
           }
-          window.showToast("× " + json.error, "error");
+          window.showToast(window.friendlyError(json), "error");
           return;
         }
         this.feedback = json.data;
       } catch (e) {
-        window.showToast("× Network error", "error");
+        window.showToast(window.netErrMsg, "error");
       } finally {
         this.submitting = false;
       }
@@ -247,7 +290,7 @@ window.quizPage = function() {
         const json = await api(
           `/api/quiz/sessions/${this.sessionId}/finish`, { method: "POST" });
         if (!json.success) {
-          window.showToast("× " + json.error, "error");
+          window.showToast(window.friendlyError(json), "error");
           this.view = "practice";
           return;
         }
@@ -255,7 +298,7 @@ window.quizPage = function() {
         this.summaryView = 'wrong';
         this.view = "summary";
       } catch (e) {
-        window.showToast("× Network error", "error");
+        window.showToast(window.netErrMsg, "error");
         this.view = "practice";
       }
     },
@@ -264,7 +307,7 @@ window.quizPage = function() {
       try {
         const json = await api(`/api/quiz/sessions/${sessionId}/summary`);
         if (!json.success) {
-          window.showToast("× " + json.error, "error");
+          window.showToast(window.friendlyError(json), "error");
           this.view = "landing";
           return;
         }
@@ -272,7 +315,7 @@ window.quizPage = function() {
         this.summaryView = 'wrong';
         this.view = "review";
       } catch (e) {
-        window.showToast("× Network error", "error");
+        window.showToast(window.netErrMsg, "error");
         this.view = "landing";
       }
     },

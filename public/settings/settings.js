@@ -18,8 +18,8 @@ window.settingsPage = function() {
 
     async resetAllLabs() {
       const ok = await Alpine.store("modal").show(
-        "This will reset ALL labs to Not Started and clear all timer data.",
-        "Reset All Labs", true
+        "This will reset ALL labs to Not Started and clear all timer data. This cannot be undone.",
+        "Reset All Labs", true, "RESET"
       );
       if (!ok) return;
       try {
@@ -41,8 +41,8 @@ window.settingsPage = function() {
 
     async resetQuizData() {
       const ok = await Alpine.store("modal").show(
-        "This will reset ALL quiz progress, sessions, and answer history. Question content is preserved.",
-        "Reset all quiz data", true,
+        "This will reset ALL quiz progress, sessions, and answer history. Question content is preserved. This cannot be undone.",
+        "Reset all quiz data", true, "RESET",
       );
       if (!ok) return;
       try {

@@ -1,56 +1,7 @@
-/* Labs page: hero stat, filter chips, status dropdown, cards-grid. */
+/* Labs page: filter chips, status dropdown, cards-grid.
+   The page-lead block uses the shared .stat-hero component (core/components.css). */
 
-/* ── Dashboard hero ───────────────────────────────────────────────────── */
-
-.hero {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 24px;
-  align-items: flex-end;
-  padding: 16px 0 28px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
-}
-.hero-left { display: flex; flex-direction: column; gap: 10px; }
-.hero-stat {
-  font-size: 56px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  color: var(--text);
-  line-height: 1;
-}
-.hero-slash, .hero-total { color: var(--text-3); font-weight: 400; }
-.hero-rule {
-  width: 28px;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 2px;
-}
-.hero-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.16em;
-  color: var(--text-3);
-}
-
-.hero-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-.hero-percent {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--text);
-}
-.hero-elapsed {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  color: var(--text-3);
-}
-.hero-elapsed::first-letter { color: var(--accent); }
+/* ── Progress track ───────────────────────────────────────────────────── */
 
 .progress-track {
   grid-column: 1 / -1;
@@ -61,9 +12,11 @@
 }
 .progress-fill {
   height: 100%;
+  width: 100%;
+  transform-origin: left;
   background: var(--accent);
   border-radius: var(--radius-pill);
-  transition: width 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Filter chips ─────────────────────────────────────────────────────── */
@@ -181,12 +134,6 @@
 }
 
 /* ── Responsive (practical-owned overrides) ───────────────────────────── */
-
-@media (max-width: 960px) {
-  .hero    { grid-template-columns: 1fr; }
-  .hero-right { align-items: flex-start; }
-  .hero-stat { font-size: 44px; }
-}
 
 @media (max-width: 560px) {
   .filter-strip { gap: 6px; }

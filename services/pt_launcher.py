@@ -92,7 +92,7 @@ def _spawn_maximize_thread(pid: int) -> None:
 async def launch_pka(lab_id: str, file_path: str | None) -> dict:
     if not file_path:
         return {"success": False,
-                "error": "This lab has not been imported yet. Go to the Import page first.",
+                "error": "This lab hasn't been imported yet.",
                 "code": "NO_FILE_IMPORTED"}
 
     pka = Path(file_path)

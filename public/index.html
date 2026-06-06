@@ -19,29 +19,29 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="core/tokens.css?v=2">
-  <link rel="stylesheet" href="core/base.css?v=2">
-  <link rel="stylesheet" href="core/components.css?v=2">
-  <link rel="stylesheet" href="nav/nav.css?v=2">
-  <link rel="stylesheet" href="modals/modals.css?v=2">
-  <link rel="stylesheet" href="practical/practical.css?v=2">
-  <link rel="stylesheet" href="practical/lab-card.css?v=2">
-  <link rel="stylesheet" href="import/import.css?v=2">
-  <link rel="stylesheet" href="stats/stats.css?v=2">
-  <link rel="stylesheet" href="quiz/quiz.css?v=2">
-  <link rel="stylesheet" href="settings/settings.css?v=2">
+  <link rel="stylesheet" href="core/tokens.css?v=4">
+  <link rel="stylesheet" href="core/base.css?v=4">
+  <link rel="stylesheet" href="core/components.css?v=4">
+  <link rel="stylesheet" href="nav/nav.css?v=4">
+  <link rel="stylesheet" href="modals/modals.css?v=4">
+  <link rel="stylesheet" href="practical/practical.css?v=4">
+  <link rel="stylesheet" href="practical/lab-card.css?v=4">
+  <link rel="stylesheet" href="import/import.css?v=4">
+  <link rel="stylesheet" href="stats/stats.css?v=4">
+  <link rel="stylesheet" href="quiz/quiz.css?v=4">
+  <link rel="stylesheet" href="settings/settings.css?v=4">
   <!-- Chart.js MUST load before Alpine (synchronous) -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="core/main.js?v=2" defer></script>
-  <script src="core/app-shell.js?v=2" defer></script>
-  <script src="practical/lab-card.js?v=2" defer></script>
-  <script src="import/import.js?v=2" defer></script>
-  <script src="stats/stats.js?v=2" defer></script>
-  <script src="quiz/quiz.js?v=2" defer></script>
-  <script src="settings/settings.js?v=2" defer></script>
+  <script src="core/main.js?v=4" defer></script>
+  <script src="core/app-shell.js?v=4" defer></script>
+  <script src="practical/lab-card.js?v=4" defer></script>
+  <script src="import/import.js?v=4" defer></script>
+  <script src="stats/stats.js?v=4" defer></script>
+  <script src="quiz/quiz.js?v=4" defer></script>
+  <script src="settings/settings.js?v=4" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js" defer></script>
 </head>
-<body x-data="appShell()" x-init="init()">
+<body x-data="appShell()" x-init="init()" @keydown.window="onGlobalKey($event)">
 
   <!--INCLUDE:nav/nav.html-->
 

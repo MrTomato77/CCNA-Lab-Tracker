@@ -42,7 +42,7 @@ a { color: inherit; text-decoration: none; }
 .btn-card-reset, .btn-primary, .theme-toggle, .nav-reset,
 .status-filter, .status-option, .folder-input,
 /* v2 quiz additions: */
-.quiz-batch-card, .quiz-choice, .quiz-pill, .quiz-finish-link,
+.quiz-batch-card, .quiz-choice, .quiz-finish-link,
 .quiz-lang-toggle, .quiz-q-status, .quiz-reset-link,
 .quiz-history-row, .quiz-wrong-item, .btn-modal-close {
   transition: all 160ms ease;
@@ -57,4 +57,16 @@ a { color: inherit; text-decoration: none; }
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: none; }
+}
+
+/* Reduced-motion baseline: collapse all motion to near-instant crossfades.
+   Page-level catch-all; component sheets may still opt into specific
+   reduced-motion treatments on top of this. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

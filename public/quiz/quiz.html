@@ -1,5 +1,6 @@
 <!-- QUIZ PAGE (v2) -->
-<div class="page quiz-page" x-show="page==='quiz'" x-data="quizPage()" x-init="init()">
+<div class="page quiz-page" x-show="page==='quiz'" x-data="quizPage()" x-init="init()"
+     @keydown.window="onKey($event)">
 
 
   <!-- LOADING -->
@@ -16,29 +17,28 @@
        x-transition:leave="quiz-view-leave"
        x-transition:leave-start="quiz-view-leave-start"
        x-transition:leave-end="quiz-view-leave-end">
-      <!-- Big mastery bar (hero style) -->
-      <header class="quiz-hero">
-        <div class="quiz-hero-left">
-          <div class="quiz-hero-stat">
-            <span x-text="String(dashboard?.mastered_count ?? 0).padStart(2,'0')"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="dashboard?.quizable_total ?? ''"></span>
+      <!-- Big mastery bar (shared stat-hero) -->
+      <header class="stat-hero">
+        <div class="stat-hero-left">
+          <div class="stat-hero-figure">
+            <span x-text="String(dashboard?.mastered_count ?? 0).padStart(2,'0')"></span><span class="stat-hero-slash"> / </span><span class="stat-hero-total" x-text="dashboard?.quizable_total ?? ''"></span>
           </div>
-          <div class="quiz-hero-rule"></div>
-          <div class="quiz-hero-label">Mastered</div>
+          <div class="stat-hero-label">Questions mastered</div>
         </div>
-        <div class="quiz-hero-right">
-          <div class="quiz-hero-percent" x-text="`${masteryPct()}% complete`"></div>
-          <div class="quiz-hero-sub">
-            out of <span x-text="dashboard?.parsed_total ?? ''"></span> parsed
+        <div class="stat-hero-right">
+          <div class="stat-hero-headline" x-text="`${masteryPct()}% complete`"></div>
+          <div class="stat-hero-sub">
+            out of <span x-text="dashboard?.parsed_total ?? ''"></span> in the pool
             (<span x-text="dashboard?.flagged_count ?? ''"></span> flagged)
           </div>
         </div>
-        <div class="progress-track"><div class="progress-fill" :style="`width:${masteryPct()}%`"></div></div>
+        <div class="progress-track"><div class="progress-fill" :style="`transform:scaleX(${masteryPct() / 100})`"></div></div>
       </header>
 
 
 
       <!-- Batch picker -->
-      <div class="quiz-batch-grid">
+      <div class="quiz-batch-grid" x-show="candidateCount() > 0">
         <template x-for="size in BATCH_SIZES" :key="size.value">
           <button class="quiz-batch-card"
                   :disabled="!canStart(size.value)"
@@ -50,18 +50,31 @@
         </template>
       </div>
 
+      <!-- Empty state: no questions in the pool yet -->
+      <div class="quiz-empty" x-show="(dashboard?.quizable_total ?? 0) === 0">
+        <p class="quiz-empty-title">No questions in the pool yet</p>
+        <p class="quiz-empty-text">Import a question set to start practicing. Questions are loaded from the backend question bank.</p>
+      </div>
+
+      <!-- Celebration: every question mastered -->
+      <div class="quiz-empty" x-show="(dashboard?.quizable_total ?? 0) > 0 && candidateCount() === 0">
+        <p class="quiz-empty-title">Every question mastered.</p>
+        <p class="quiz-empty-text">You've cleared the whole pool. Reset quiz data in Settings to run through it again.</p>
+      </div>
+
       <!-- Recent sessions -->
-      <hr class="section-divider">
-      <div class="quiz-history">
-        <template x-if="dashboard && dashboard.recent_sessions.length === 0">
-          <p class="empty-state">No sessions yet.</p>
-        </template>
+      <hr class="section-divider" x-show="dashboard && dashboard.recent_sessions.length > 0">
+      <div class="quiz-history" x-show="dashboard && dashboard.recent_sessions.length > 0">
+        <div class="quiz-history-head">
+          <span>Recent sessions</span>
+          <span class="quiz-history-legend">score · accuracy · time · best streak · when</span>
+        </div>
         <template x-for="s in (dashboard?.recent_sessions || [])" :key="s.id">
-          <div class="quiz-history-row" @click="viewSession(s.id)">
-            <span class="quiz-history-score" x-text="`${s.total_correct}/${s.total_seen}`"></span>
-            <span class="quiz-history-pct"   x-text="`(${s.accuracy}%)`"></span>
-            <span class="quiz-history-meta"  x-text="`· ${formatDur(s.duration_sec)} · best ${s.best_streak} · ${ago(s.started_at)}`"></span>
-            <span class="quiz-history-arrow">→</span>
+          <div class="quiz-history-row" @click="viewSession(s.id)" title="Open this session to review answers">
+            <span class="quiz-history-score" :title="`${s.total_correct} correct of ${s.total_seen}`" x-text="`${s.total_correct}/${s.total_seen}`"></span>
+            <span class="quiz-history-pct" title="Accuracy" x-text="`(${s.accuracy}%)`"></span>
+            <span class="quiz-history-meta" x-text="`· ${formatDur(s.duration_sec)} · best ${s.best_streak} · ${ago(s.started_at)}`"></span>
+            <span class="quiz-history-arrow" aria-hidden="true">→</span>
           </div>
         </template>
       </div>
@@ -77,19 +90,18 @@
        x-transition:leave="quiz-view-leave"
        x-transition:leave-start="quiz-view-leave-start"
        x-transition:leave-end="quiz-view-leave-end">
-      <header class="quiz-hero" style="margin-bottom: 24px;">
-        <div class="quiz-hero-left">
-          <div class="quiz-hero-stat">
-            <span x-text="String((currentQ?.position?.seen ?? 0) + 1).padStart(2,'0')"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="currentQ?.position?.total != null ? currentQ.position.total : '∞'"></span>
+      <header class="stat-hero">
+        <div class="stat-hero-left">
+          <div class="stat-hero-figure">
+            <span x-text="String((currentQ?.position?.seen ?? 0) + 1).padStart(2,'0')"></span><span class="stat-hero-slash"> / </span><span class="stat-hero-total" x-text="currentQ?.position?.total != null ? currentQ.position.total : '∞'"></span>
           </div>
-          <div class="quiz-hero-rule"></div>
-          <div class="quiz-hero-label">Question</div>
+          <div class="stat-hero-label">Question</div>
         </div>
-        <div class="quiz-hero-right">
-          <div class="quiz-hero-percent" x-text="`⏱ ${elapsedFormatted}`"></div>
-          <button class="quiz-finish-link" @click="finishSession()" style="margin-top: 4px;">Finish session</button>
+        <div class="stat-hero-right">
+          <div class="stat-hero-headline stat-hero-sub--mono" x-text="elapsedFormatted"></div>
+          <button class="quiz-finish-link" @click="finishSession()">Finish session</button>
         </div>
-        <div class="progress-track"><div class="progress-fill" :style="`width:${progressPct()}%`"></div></div>
+        <div class="progress-track"><div class="progress-fill" :style="`transform:scaleX(${progressPct() / 100})`"></div></div>
       </header>
 
       <div class="quiz-question" x-data="{ showTh: false }" x-init="$watch('currentQ', () => showTh = false)">
@@ -146,13 +158,18 @@
         </template>
 
         <div class="quiz-actions">
+          <span class="quiz-kbd-hint" x-show="!feedback" aria-hidden="true">Keys <kbd>1</kbd>–<kbd x-text="String(Math.min(9, currentQ?.choices?.length ?? 0))"></kbd> to pick, <kbd>Enter</kbd> to submit</span>
+          <span class="quiz-kbd-hint" x-show="feedback" aria-hidden="true"><kbd>Enter</kbd> for next</span>
           <button class="btn-primary btn-primary--ghost" x-show="!feedback"
                   :disabled="submitting"
                   @click="iDontKnow()">I don't know</button>
           <button class="btn-primary" x-show="!feedback"
                   :disabled="selection.length === 0 || submitting"
-                  @click="submit()">Submit</button>
-          <button class="btn-primary" x-show="feedback" @click="fetchNext()">Next →</button>
+                  @click="submit()">Submit answer</button>
+          <button class="btn-primary" x-show="feedback" :disabled="loadingNext" @click="fetchNext()">
+            <span x-show="!loadingNext">Next →</span>
+            <span x-show="loadingNext" x-cloak>Loading…</span>
+          </button>
         </div>
       </div>
     </div>
@@ -166,19 +183,18 @@
        x-transition:leave="quiz-view-leave"
        x-transition:leave-start="quiz-view-leave-start"
        x-transition:leave-end="quiz-view-leave-end">
-      <header class="quiz-hero" style="margin-bottom: 24px;">
-        <div class="quiz-hero-left">
-          <div class="quiz-hero-stat">
-            <span x-text="finalSummary?.total_correct ?? ''"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="finalSummary?.total_seen ?? ''"></span>
+      <header class="stat-hero">
+        <div class="stat-hero-left">
+          <div class="stat-hero-figure">
+            <span x-text="finalSummary?.total_correct ?? ''"></span><span class="stat-hero-slash"> / </span><span class="stat-hero-total" x-text="finalSummary?.total_seen ?? ''"></span>
           </div>
-          <div class="quiz-hero-rule"></div>
-          <div class="quiz-hero-label">Score</div>
+          <div class="stat-hero-label">Score</div>
         </div>
-        <div class="quiz-hero-right">
-          <div class="quiz-hero-percent" x-text="finalSummary ? `${finalSummary.accuracy}% accuracy` : ''"></div>
-          <div class="quiz-hero-sub" x-text="finalSummary ? `Duration: ${formatDur(finalSummary.duration_sec)}` : ''"></div>
+        <div class="stat-hero-right">
+          <div class="stat-hero-headline" x-text="finalSummary ? `${finalSummary.accuracy}% accuracy` : ''"></div>
+          <div class="stat-hero-sub" x-text="finalSummary ? `Duration: ${formatDur(finalSummary.duration_sec)}` : ''"></div>
         </div>
-        <div class="progress-track"><div class="progress-fill" :style="`width:${finalSummary?.accuracy ?? 0}%`"></div></div>
+        <div class="progress-track"><div class="progress-fill" :style="`transform:scaleX(${(finalSummary?.accuracy ?? 0) / 100})`"></div></div>
       </header>
 
       <!-- Toggle: Wrong / Correct -->
@@ -287,6 +303,11 @@
           </template>
         </div>
       </div>
+
+      <!-- Keep the momentum: rerun the same batch size -->
+      <div class="quiz-summary-footer">
+        <button class="btn-primary" @click="practiceAgain()">Practice again</button>
+      </div>
     </div>
 
   <!-- REVIEW (past session) -->
@@ -298,19 +319,18 @@
        x-transition:leave="quiz-view-leave"
        x-transition:leave-start="quiz-view-leave-start"
        x-transition:leave-end="quiz-view-leave-end">
-      <header class="quiz-hero" style="margin-bottom: 24px;">
-        <div class="quiz-hero-left">
-          <div class="quiz-hero-stat">
-            <span x-text="reviewSummary?.total_correct ?? ''"></span><span class="quiz-hero-slash"> / </span><span class="quiz-hero-total" x-text="reviewSummary?.total_seen ?? ''"></span>
+      <header class="stat-hero">
+        <div class="stat-hero-left">
+          <div class="stat-hero-figure">
+            <span x-text="reviewSummary?.total_correct ?? ''"></span><span class="stat-hero-slash"> / </span><span class="stat-hero-total" x-text="reviewSummary?.total_seen ?? ''"></span>
           </div>
-          <div class="quiz-hero-rule"></div>
-          <div class="quiz-hero-label">Score</div>
+          <div class="stat-hero-label">Score</div>
         </div>
-        <div class="quiz-hero-right">
-          <div class="quiz-hero-percent" x-text="reviewSummary ? `${reviewSummary.accuracy}% accuracy` : ''"></div>
-          <div class="quiz-hero-sub" x-text="reviewSummary ? `Duration: ${formatDur(reviewSummary.duration_sec)}` : ''"></div>
+        <div class="stat-hero-right">
+          <div class="stat-hero-headline" x-text="reviewSummary ? `${reviewSummary.accuracy}% accuracy` : ''"></div>
+          <div class="stat-hero-sub" x-text="reviewSummary ? `Duration: ${formatDur(reviewSummary.duration_sec)}` : ''"></div>
         </div>
-        <div class="progress-track"><div class="progress-fill" :style="`width:${reviewSummary?.accuracy ?? 0}%`"></div></div>
+        <div class="progress-track"><div class="progress-fill" :style="`transform:scaleX(${(reviewSummary?.accuracy ?? 0) / 100})`"></div></div>
       </header>
 
       <!-- Toggle: Wrong / Correct -->
