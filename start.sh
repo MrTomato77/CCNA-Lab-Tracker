@@ -11,17 +11,24 @@ echo "    CCNA Lab Tracker"
 echo "  ====================================================="
 echo
 
-# Check port 8080 not in use. lsof is on most distros / macOS; fall
+# Read PORT from .env (falls back to 8080). Must mirror app.py's default.
+PORT=8080
+if [ -f .env ]; then
+    env_port=$(grep -E '^PORT=' .env | tail -1 | cut -d= -f2 | tr -d '[:space:]')
+    [ -n "$env_port" ] && PORT=$env_port
+fi
+
+# Check port not in use. lsof is on most distros / macOS; fall
 # back to ss for minimal containers.
 if command -v lsof >/dev/null 2>&1; then
-    if lsof -i :8080 -sTCP:LISTEN >/dev/null 2>&1; then
-        echo "  [WARN] Port 8080 is already in use."
+    if lsof -i ":$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+        echo "  [WARN] Port $PORT is already in use."
         echo "  Run ./stop.sh first, then try again."
         exit 1
     fi
 elif command -v ss >/dev/null 2>&1; then
-    if ss -ltn 'sport = :8080' | grep -q LISTEN; then
-        echo "  [WARN] Port 8080 is already in use."
+    if ss -ltn "sport = :$PORT" | grep -q LISTEN; then
+        echo "  [WARN] Port $PORT is already in use."
         echo "  Run ./stop.sh first, then try again."
         exit 1
     fi
@@ -46,6 +53,6 @@ echo "  [INFO] Verifying dependencies..."
 pip install -q -r requirements.txt --disable-pip-version-check
 
 # Open browser after 2s; ignore errors if no browser available (headless).
-( sleep 2 && (xdg-open http://localhost:8080 || open http://localhost:8080) >/dev/null 2>&1 ) &
+( sleep 2 && (xdg-open "http://localhost:$PORT" || open "http://localhost:$PORT") >/dev/null 2>&1 ) &
 
 python app.py

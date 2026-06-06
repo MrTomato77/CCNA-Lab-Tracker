@@ -7,10 +7,18 @@ echo    CCNA Lab Tracker v4.2
 echo  =====================================================
 echo.
 
-:: Check port 8080 not already in use
-netstat -aon | findstr ":8080 " | findstr "LISTENING" >nul 2>&1
+:: Read PORT from .env (falls back to 8080). Must mirror app.py's default.
+set "PORT=8080"
+if exist .env (
+    for /f "usebackq tokens=1,* delims==" %%A in (".env") do (
+        if /i "%%A"=="PORT" set "PORT=%%B"
+    )
+)
+
+:: Check port not already in use
+netstat -aon | findstr ":%PORT% " | findstr "LISTENING" >nul 2>&1
 if not errorlevel 1 (
-    echo  [WARN] Port 8080 is already in use.
+    echo  [WARN] Port %PORT% is already in use.
     echo  Run stop.bat first, then try again.
     echo.
     pause & exit /b 1
@@ -40,7 +48,7 @@ if errorlevel 1 (
 echo.
 
 :: Open browser after 2s delay
-start /b cmd /c "timeout /t 2 >nul && start http://localhost:8080"
+start /b cmd /c "timeout /t 2 >nul && start http://localhost:%PORT%"
 
 python app.py
 pause

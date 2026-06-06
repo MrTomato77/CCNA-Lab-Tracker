@@ -3,18 +3,26 @@
 # on :8080 and sends SIGTERM (fall back to SIGKILL if it doesn't exit).
 
 set -e
+cd "$(dirname "$0")"
 
-echo "  Stopping server on port 8080..."
+# Read PORT from .env (falls back to 8080). Must mirror app.py's default.
+PORT=8080
+if [ -f .env ]; then
+    env_port=$(grep -E '^PORT=' .env | tail -1 | cut -d= -f2 | tr -d '[:space:]')
+    [ -n "$env_port" ] && PORT=$env_port
+fi
+
+echo "  Stopping server on port $PORT..."
 
 PID=""
 if command -v lsof >/dev/null 2>&1; then
-    PID=$(lsof -t -i :8080 -sTCP:LISTEN 2>/dev/null || true)
+    PID=$(lsof -t -i ":$PORT" -sTCP:LISTEN 2>/dev/null || true)
 elif command -v ss >/dev/null 2>&1; then
-    PID=$(ss -ltnp 'sport = :8080' 2>/dev/null | grep -oP 'pid=\K\d+' | head -1 || true)
+    PID=$(ss -ltnp "sport = :$PORT" 2>/dev/null | grep -oP 'pid=\K\d+' | head -1 || true)
 fi
 
 if [ -z "$PID" ]; then
-    echo "  [INFO] No process found on port 8080."
+    echo "  [INFO] No process found on port $PORT."
     exit 0
 fi
 

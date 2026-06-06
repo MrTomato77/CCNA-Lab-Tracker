@@ -17,6 +17,7 @@ from routers import labs, progress, launcher, stats, importer, quiz
 
 app = Robyn(__file__)
 
+PORT     = int(os.getenv("PORT", 8080))
 PUBLIC   = Path(__file__).parent / "public"
 DOCS_DIR = (Path(__file__).parent / "docs").resolve()
 
@@ -88,7 +89,8 @@ def _resolve_static_path(rel: str) -> "str | None":
 async def index(request: Request) -> Response:
     return Response(
         status_code=200,
-        headers={"Content-Type": "text/html; charset=utf-8"},
+        headers={"Content-Type": "text/html; charset=utf-8",
+                 "Cache-Control": "no-cache"},
         description=_STATIC["index.html"],
     )
 
@@ -102,9 +104,12 @@ def _static_response(safe: str) -> Response:
     only permits .html/.css/.js).
     """
     ext = "." + safe.rsplit(".", 1)[-1]
+    # no-cache: browser must revalidate each load, so edits to CSS/JS show up
+    # without bumping a ?v= query. Same-origin localhost app; bandwidth is moot.
     return Response(
         status_code=200,
-        headers={"Content-Type": _CONTENT_TYPES.get(ext, "text/plain")},
+        headers={"Content-Type": _CONTENT_TYPES.get(ext, "text/plain"),
+                 "Cache-Control": "no-cache"},
         description=_STATIC[safe],
     )
 
@@ -204,7 +209,7 @@ async def startup() -> None:
         logger.bind(name="config").warning(
             f"Packet Tracer not found at {PT_EXE} — edit PACKET_TRACER_EXE in .env"
         )
-    logger.bind(name="app").info("listening on http://localhost:8080")
+    logger.bind(name="app").info(f"listening on http://localhost:{PORT}")
 
 @app.shutdown_handler
 async def shutdown() -> None:
@@ -212,5 +217,4 @@ async def shutdown() -> None:
     logger.bind(name="app").info("server stopped")
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8080))
-    app.start(port=port, host="127.0.0.1")
+    app.start(port=PORT, host="127.0.0.1")
