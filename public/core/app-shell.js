@@ -1,14 +1,16 @@
 // window.appShell — root SPA component (nav routing, page state, lab management).
 // Depends on core/main.js for Alpine stores + api() + showToast.
 
-// Internal page state <-> URL hash. Keeps the hash human-readable
-// (#practical) while the Alpine state keeps its historical names (dashboard).
-const PAGE_TO_HASH = Object.freeze({
-  dashboard: "practical", quiz: "quiz", stats: "analytics",
-  settings: "settings", import: "import",
+// Internal page state <-> clean URL path (History API, no hash). The Alpine
+// state keeps its historical names (dashboard/stats); the URL is readable
+// (/practical, /analytics). Server serves index.html for each of these so a
+// direct load or refresh boots the app (see app.py).
+const PAGE_TO_PATH = Object.freeze({
+  dashboard: "/practical", quiz: "/quiz", stats: "/analytics",
+  settings: "/settings", import: "/import",
 });
-const HASH_TO_PAGE = Object.freeze(
-  Object.fromEntries(Object.entries(PAGE_TO_HASH).map(([p, h]) => [h, p]))
+const PATH_TO_PAGE = Object.freeze(
+  Object.fromEntries(Object.entries(PAGE_TO_PATH).map(([p, path]) => [path, p]))
 );
 
 // ── App Shell ─────────────────────────────────────────────────────────────
@@ -71,12 +73,19 @@ window.appShell = function() {
         this.panels = [{ id: 0, fc: this.filterCat, hs: this.hideStatus, visible: true }];
       } catch (e) { /* localStorage may be blocked */ }
 
-      // Hash routing: hydrate from the URL, then keep the two in sync.
-      this.applyHash();
-      window.addEventListener("hashchange", () => this.applyHash());
+      // Path routing: hydrate from the URL, then keep the two in sync.
+      this.applyPath();
+      window.addEventListener("popstate", () => this.applyPath());
       this.$watch("page", (p) => {
-        const hash = "#" + (PAGE_TO_HASH[p] || p);
-        if (location.hash !== hash) location.hash = hash;
+        const base = PAGE_TO_PATH[p] || "/";
+        // Push the base path only when moving in from a different section, so
+        // we don't clobber a sub-path the page owns (e.g. /quiz/<id>). The page
+        // component manages its own deeper segments.
+        const seg = "/" + location.pathname.split("/")[1];
+        if (seg !== base) {
+          history.pushState({ page: p }, "", base);
+          window.dispatchEvent(new CustomEvent("section-entered", { detail: { page: p } }));
+        }
       });
 
       await this.fetchLabs();
@@ -112,16 +121,19 @@ window.appShell = function() {
       }
     },
 
-    // Map the current URL hash onto page state (no-op for unknown hashes).
-    applyHash() {
-      const key = location.hash.replace(/^#/, "");
-      const target = HASH_TO_PAGE[key];
-      if (target && target !== this.page) {
-        this.page = target;
-      } else if (!location.hash) {
-        // Seed the hash on first load so back/forward has an entry to return to.
-        location.replace("#" + (PAGE_TO_HASH[this.page] || this.page));
+    // Map the current URL path onto page state (no-op for unknown paths).
+    // Matches the exact path first, then the first segment so deeper paths
+    // like /quiz/<id> still resolve to their section (quiz).
+    applyPath() {
+      const path = location.pathname;
+      if (path === "/") {
+        // Normalize bare root to the default page's path without a history entry.
+        history.replaceState({ page: this.page }, "", PAGE_TO_PATH[this.page] || "/");
+        return;
       }
+      const seg = "/" + path.split("/")[1];
+      const target = PATH_TO_PAGE[path] || PATH_TO_PAGE[seg];
+      if (target && target !== this.page) this.page = target;
     },
 
     // True when every lab in the category is done — turns the chip green.

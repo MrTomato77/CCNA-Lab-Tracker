@@ -85,14 +85,46 @@ def _resolve_static_path(rel: str) -> "str | None":
     return rel
 
 
-@app.get("/")
-async def index(request: Request) -> Response:
+def _index_response() -> Response:
     return Response(
         status_code=200,
         headers={"Content-Type": "text/html; charset=utf-8",
                  "Cache-Control": "no-cache"},
         description=_STATIC["index.html"],
     )
+
+
+@app.get("/")
+async def index(request: Request) -> Response:
+    return _index_response()
+
+
+# Client-side routes: the SPA owns these paths (History API, no hash). Serving
+# index.html here lets a direct load or refresh of e.g. /quiz boot the app,
+# which then renders the matching page. Keep in sync with PAGE_TO_PATH in
+# public/core/app-shell.js.
+@app.get("/practical")
+async def page_practical(request: Request) -> Response:
+    return _index_response()
+
+@app.get("/quiz")
+async def page_quiz(request: Request) -> Response:
+    return _index_response()
+
+# Deep link to a past session review (/quiz/session/<id>). Three segments so it
+# never collides with the two-segment static assets under /quiz/ (quiz.js, etc.);
+# the SPA reads the id and opens that session on direct load or refresh.
+@app.get("/quiz/session/:session_id")
+async def page_quiz_session(request: Request) -> Response:
+    return _index_response()
+
+@app.get("/analytics")
+async def page_analytics(request: Request) -> Response:
+    return _index_response()
+
+@app.get("/settings")
+async def page_settings(request: Request) -> Response:
+    return _index_response()
 
 def _static_response(safe: str) -> Response:
     """Build a 200 Response for a validated *safe* static-file key.
