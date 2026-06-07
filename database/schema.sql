@@ -25,3 +25,15 @@ CREATE TABLE IF NOT EXISTS attempts (
     duration    INTEGER DEFAULT NULL,
     FOREIGN KEY (lab_id) REFERENCES labs(id)
 );
+
+-- Binary asset store: makes the DB the single portable source of truth.
+-- Lab PDFs, quiz images, and Packet Tracer .pka files live here as BLOBs so
+-- the whole dataset moves with labs.db (no separate docs/, data/, labs/ dirs,
+-- no machine-specific absolute paths). Populated by scripts/bundle_assets.py.
+CREATE TABLE IF NOT EXISTS assets (
+    kind         TEXT NOT NULL,           -- 'pdf' | 'image' | 'pka'
+    name         TEXT NOT NULL,           -- 'LAB-01.pdf' | 'Q-0001-0.png' | 'LAB-01.pka'
+    content_type TEXT NOT NULL,
+    bytes        BLOB NOT NULL,
+    PRIMARY KEY (kind, name)
+);

@@ -9,10 +9,9 @@ setup_logging()
 
 from pathlib import Path
 import re
-import aiofiles
 from robyn import Robyn, Request, Response
 from loguru import logger
-from database.connection import init_db, close_db
+from database.connection import init_db, close_db, get_db
 from routers import labs, progress, launcher, stats, importer, quiz
 
 app = Robyn(__file__)
@@ -180,30 +179,30 @@ async def favicon_ico(request: Request) -> Response:
     # Browsers request /favicon.ico regardless of the HTML <link> — alias to keep logs clean.
     return await logo_ico(request)
 
-def is_safe_doc_path(filename: str) -> bool:
-    """Return True when filename resolves to a PDF inside DOCS_DIR."""
-    if not filename.endswith(".pdf"):
-        return False
-    try:
-        pdf = (DOCS_DIR / filename).resolve()
-    except (OSError, ValueError):
-        return False
-    return pdf.is_relative_to(DOCS_DIR)
+_SAFE_PDF_RE = re.compile(r"^LAB-\d{2}\.pdf$")
+
+def is_safe_doc_name(filename: str) -> bool:
+    """Return True when filename is a valid lab PDF name (LAB-NN.pdf)."""
+    return bool(_SAFE_PDF_RE.fullmatch(filename))
 
 @app.get("/docs/:filename")
 async def lab_docs(request: Request) -> Response:
+    """Serve a lab PDF from the assets table (kind='pdf')."""
     filename = request.path_params.get("filename", "")
-    if not is_safe_doc_path(filename):
+    if not is_safe_doc_name(filename):
         return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
-    pdf = (DOCS_DIR / filename).resolve()
-    if not pdf.is_file():
+    db = await get_db()
+    async with db.execute(
+        "SELECT bytes, content_type FROM assets WHERE kind='pdf' AND name=?",
+        (filename,),
+    ) as cur:
+        row = await cur.fetchone()
+    if row is None:
         return Response(status_code=404, headers={"Content-Type": "text/plain"}, description="Not found")
-    async with aiofiles.open(pdf, "rb") as f:
-        data = await f.read()
     return Response(
         status_code=200,
-        headers={"Content-Type": "application/pdf"},
-        description=data,
+        headers={"Content-Type": row["content_type"] or "application/pdf"},
+        description=bytes(row["bytes"]),
     )
 
 app.include_router(labs.router)

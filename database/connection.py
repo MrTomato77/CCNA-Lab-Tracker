@@ -67,21 +67,24 @@ async def _seed_if_empty(db: aiosqlite.Connection) -> None:
 
 
 async def _sync_asset_paths(db: aiosqlite.Connection) -> None:
-    # Auto-detect PDFs in docs/ and .pka in labs/ on each startup — no
-    # manual import step needed after running split_pdf.py or dropping files.
-    project_root = Path(__file__).parent.parent
-    docs_dir = project_root / "docs"
-    labs_dir = project_root / "labs"
+    # Derive each lab's "has docs?" / "imported?" markers from the assets table
+    # (the portable source of truth). Stored as the bare filename — a truthy,
+    # machine-independent value the UI's `lab.docs_path` / `lab.file_path` checks
+    # rely on — never a machine-specific absolute path.
+    async with db.execute("SELECT name FROM assets WHERE kind='pdf'") as cur:
+        pdfs = {r["name"] for r in await cur.fetchall()}
+    async with db.execute("SELECT name FROM assets WHERE kind='pka'") as cur:
+        pkas = {r["name"] for r in await cur.fetchall()}
     async with db.execute("SELECT id FROM labs") as cur:
         lab_ids = [r["id"] for r in await cur.fetchall()]
     for lab_id in lab_ids:
-        pdf = docs_dir / f"{lab_id}.pdf"
-        pka = labs_dir / f"{lab_id}.pka"
+        pdf_name = f"{lab_id}.pdf"
+        pka_name = f"{lab_id}.pka"
         await db.execute(
             "UPDATE labs SET docs_path=?, file_path=? WHERE id=?",
             (
-                str(pdf) if pdf.exists() else None,
-                str(pka) if pka.exists() else None,
+                pdf_name if pdf_name in pdfs else None,
+                pka_name if pka_name in pkas else None,
                 lab_id,
             ),
         )

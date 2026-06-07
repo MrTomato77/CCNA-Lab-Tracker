@@ -89,18 +89,44 @@ def _spawn_maximize_thread(pid: int) -> None:
     ).start()
 
 
+LABS_DIR = Path(__file__).resolve().parent.parent / "labs"
+
+
+async def _materialize_pka(lab_id: str, dest: Path) -> bool:
+    """Write the lab's .pka bytes from the assets table to *dest*.
+
+    The DB is the source of truth; Packet Tracer needs a real file on disk, so
+    we extract on demand into labs/ and launch from there. Returns False if the
+    lab has no stored .pka.
+    """
+    from database.connection import get_db
+    db = await get_db()
+    async with db.execute(
+        "SELECT bytes FROM assets WHERE kind='pka' AND name=?",
+        (f"{lab_id}.pka",),
+    ) as cur:
+        row = await cur.fetchone()
+    if row is None:
+        return False
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(bytes(row["bytes"]))
+    return True
+
+
 async def launch_pka(lab_id: str, file_path: str | None) -> dict:
+    # file_path is now an availability marker (set by the asset sync), not a real
+    # path — the bytes live in the DB. None means the lab was never imported.
     if not file_path:
         return {"success": False,
                 "error": "This lab hasn't been imported yet.",
                 "code": "NO_FILE_IMPORTED"}
 
-    pka = Path(file_path)
+    pka = LABS_DIR / f"{lab_id}.pka"
     pt  = Path(PT_EXE)
 
-    if not pka.exists():
+    if not pka.exists() and not await _materialize_pka(lab_id, pka):
         return {"success": False,
-                "error": f".pka file not found at {file_path}. Please re-import this lab.",
+                "error": "This lab's .pka isn't in the database. Re-bundle assets.",
                 "code": "PKA_NOT_FOUND"}
 
     if not pt.exists():

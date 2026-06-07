@@ -75,9 +75,17 @@ def _validate_size(filename: str, lab_id: str, size: int) -> dict | None:
         )
     return None
 
-async def _update_db(lab_id: str, path: Path) -> None:
+async def _store_lab_pka(lab_id: str, content: bytes) -> None:
+    """Persist the .pka into the assets table (source of truth) and set the
+    lab's availability marker. The on-disk copy under labs/ is just a launch
+    cache — pt_launcher re-materializes from the DB if it's missing."""
     db = await get_db()
-    await db.execute("UPDATE labs SET file_path=? WHERE id=?", (str(path), lab_id))
+    await db.execute(
+        "INSERT OR REPLACE INTO assets (kind, name, content_type, bytes) "
+        "VALUES ('pka', ?, 'application/octet-stream', ?)",
+        (f"{lab_id}.pka", content),
+    )
+    await db.execute("UPDATE labs SET file_path=? WHERE id=?", (f"{lab_id}.pka", lab_id))
     await db.commit()
 
 async def import_from_bytes(filename: str, content: bytes) -> dict:
@@ -92,7 +100,7 @@ async def import_from_bytes(filename: str, content: bytes) -> dict:
     try:
         async with aiofiles.open(dest, "wb") as f:
             await f.write(content)
-        await _update_db(lab_id, dest)
+        await _store_lab_pka(lab_id, content)
         return _result(filename, "imported", lab_id=lab_id, dest=dest)
     except Exception as e:
         logger.error(f"Upload write failed: {e}")
@@ -115,7 +123,7 @@ async def import_single_file(src: Path) -> dict:
     dest = dest_path(lab_id)
     try:
         shutil.copy2(str(src), str(dest))
-        await _update_db(lab_id, dest)
+        await _store_lab_pka(lab_id, dest.read_bytes())
         logger.success(f"Imported {src.name} → {dest.name}")
         return _result(src.name, "imported", lab_id=lab_id, dest=dest)
     except Exception as e:
