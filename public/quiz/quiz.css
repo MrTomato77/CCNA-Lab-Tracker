@@ -71,36 +71,36 @@
 .quiz-history {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
-.quiz-history-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+.quiz-history-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
   margin-bottom: 4px;
 }
-.quiz-history-legend {
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--text-3);
-  font-family: var(--font-mono);
+/* Header row and data rows share the same column track so values line up. */
+.quiz-history-headrow,
+.quiz-history-row {
+  display: grid;
+  grid-template-columns: 56px 64px 64px 76px 1fr 16px;
+  gap: 14px;
+  align-items: center;
 }
-@media (max-width: 560px) {
-  .quiz-history-legend { display: none; }
+.quiz-history-headrow {
+  padding: 0 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
 }
 .quiz-history-row {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   transition: border-color 150ms ease, background 150ms ease;
 }
@@ -108,14 +108,20 @@
   border-color: var(--accent);
   background: var(--accent-tint);
 }
-.quiz-history-arrow {
-  margin-left: auto;
-  color: var(--text-3);
-  font-size: 14px;
-}
 .quiz-history-score { font-weight: 600; color: var(--text); }
 .quiz-history-pct   { color: var(--accent); }
-.quiz-history-meta  { color: var(--text-3); font-size: 13px; }
+.quiz-history-cell  { color: var(--text-3); font-variant-numeric: tabular-nums; }
+.quiz-history-arrow { color: var(--text-3); text-align: right; font-size: 13px; }
+
+@media (max-width: 560px) {
+  .quiz-history-headrow { display: none; }
+  .quiz-history-row {
+    grid-template-columns: 64px 60px 1fr 20px;
+  }
+  /* Drop the time (3rd) and best-streak (4th) columns on narrow screens. */
+  .quiz-history-row > :nth-child(3),
+  .quiz-history-row > :nth-child(4) { display: none; }
+}
 
 .quiz-reset-link {
   align-self: center;
@@ -317,12 +323,6 @@
   .quiz-kbd-hint { display: none; }
 }
 
-/* Summary footer: the "practice again" call to action. */
-.quiz-summary-footer {
-  display: flex;
-  justify-content: center;
-  padding-top: 8px;
-}
 
 /* Summary answer toggle */
 .quiz-summary {
@@ -416,8 +416,9 @@
   border-radius: 8px;
   padding: 10px 14px;
 }
-.quiz-answer-item--wrong   { border-color: var(--reset-border); background: var(--reset-tint); }
-.quiz-answer-item--correct { border-color: var(--done-border);  background: var(--surface-tint-done); }
+/* No per-item tint: the Wrong / Correct toggle already separates the two
+   lists, so a full red/green wash would only add noise. Status shows in the
+   expanded body (correct answer highlighted) and the small status glyph. */
 .quiz-answer-summary {
   display: flex;
   align-items: center;
@@ -445,9 +446,42 @@
   color: var(--text-2);
   white-space: pre-line;
 }
+/* Clip element for the grid-rows collapse: no padding here, or border-box
+   keeps it and leaves a residual strip when the row track is 0fr. All visual
+   padding lives on .quiz-answer-inner so it gets clipped cleanly when closed. */
 .quiz-answer-body {
-  margin-top: 10px;
-  padding: 0 6px;
+  overflow: hidden;
+  min-height: 0;
+}
+.quiz-answer-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 2px 2px 2px 2px;
+}
+/* Explanation gets its own panel inside the card. */
+.quiz-answer-exple {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.quiz-answer-exple-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.quiz-answer-exple-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-2);
+  white-space: pre-line;
 }
 .quiz-answer-choices {
   list-style: none;
@@ -525,22 +559,18 @@
   animation: qadv-in 240ms var(--tx-easing-default);
 }
 
-/* Collapse animation for summary wrong-answer body.
-   Uses the grid-template-rows 0fr → 1fr technique instead of animating
-   max-height: it transitions a single layout-driven value to the content's
-   exact height (no magic ceiling) and stays on the compositor-friendly path.
-   Class-toggle (not Alpine x-transition) because Alpine's enter/leave class
-   machinery threw uncaught promise rejections on our class names. */
+/* Expand/collapse for the answer body. grid-template-rows 0fr → 1fr animates
+   to the content's exact height, so opening AND closing are equally smooth
+   (max-height to a fixed ceiling makes opening snap once the visible content
+   fills). Works cleanly because all padding lives on .quiz-answer-inner, not
+   on the clipped .quiz-answer-body, so 0fr truly collapses to 0. Class-toggle
+   (not Alpine x-transition): its class machinery threw promise rejections. */
 .quiz-answer-body-wrap {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
-  transition: grid-template-rows 220ms var(--tx-easing-default),
-              opacity 200ms var(--tx-easing-default);
-}
-.quiz-answer-body-wrap > .quiz-answer-body {
-  overflow: hidden;
-  min-height: 0;
+  transition: grid-template-rows 240ms var(--tx-easing-default),
+              opacity 180ms var(--tx-easing-default);
 }
 .quiz-answer-body-wrap.is-open {
   grid-template-rows: 1fr;

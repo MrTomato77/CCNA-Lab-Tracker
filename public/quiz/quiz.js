@@ -23,6 +23,7 @@ window.quizPage = function() {
     loadingNext: false,      // in-session fetch; keeps the question on screen
     finalSummary: null,
     reviewSummary: null,
+    reviewSessionId: null,   // id currently shown in review (for URL sync)
     summaryView: 'wrong',
     startedAt: 0,             // ms
     elapsed: 0,               // ms
@@ -33,6 +34,31 @@ window.quizPage = function() {
 
     async init() {
       await this.loadDashboard();
+      // Deep-link sync: open a session if the URL is /quiz/<id>; keep view and
+      // URL in step on back/forward and when the Quiz tab is (re)entered.
+      this.syncRoute();
+      window.addEventListener("popstate", () => this.syncRoute());
+      window.addEventListener("section-entered", (e) => {
+        if (e.detail && e.detail.page === "quiz") this.syncRoute();
+      });
+    },
+
+    // Match the URL's quiz sub-segment to the view (no push; URL is the source).
+    syncRoute() {
+      const m = location.pathname.match(/^\/quiz\/session\/([^/]+)$/);
+      if (m) {
+        if (this.reviewSessionId !== m[1]) this.viewSession(m[1], true);
+      } else {
+        // Bare /quiz: drop back to landing from a review/summary, but never
+        // interrupt an active practice run.
+        this.reviewSessionId = null;
+        if (this.view !== "landing" && this.view !== "practice") this._goLanding();
+      }
+    },
+
+    _setQuizPath(sub) {
+      const path = sub ? `/quiz/session/${sub}` : "/quiz";
+      if (location.pathname !== path) history.pushState({}, "", path);
     },
 
     // Keyboard accelerators. Bound via @keydown.window on the quiz root; we
@@ -139,6 +165,14 @@ window.quizPage = function() {
       if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
       if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
       return `${Math.floor(diff/86400)}d ago`;
+    },
+    // Absolute timestamp for the session log: "07/06/2026 16:42"
+    // (dd/mm/yyyy HH:MM). Relative time goes in the row's tooltip via ago().
+    when(iso) {
+      if (!iso) return "—";
+      const d = new Date(iso);
+      const p = (n) => String(n).padStart(2, "0");
+      return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
     },
 
     async startSession(batchSize) {
@@ -297,26 +331,33 @@ window.quizPage = function() {
         this.finalSummary = json.data;
         this.summaryView = 'wrong';
         this.view = "summary";
+        // A finished session is reviewable: deep-link it so refresh reopens it.
+        this.reviewSessionId = String(this.sessionId);
+        this._setQuizPath(this.sessionId);
       } catch (e) {
         window.showToast(window.netErrMsg, "error");
         this.view = "practice";
       }
     },
 
-    async viewSession(sessionId) {
+    // hydrate=true when called from URL sync (back/forward, direct load): skip
+    // pushing a new history entry, since the URL already points here.
+    async viewSession(sessionId, hydrate = false) {
       try {
         const json = await api(`/api/quiz/sessions/${sessionId}/summary`);
         if (!json.success) {
           window.showToast(window.friendlyError(json), "error");
-          this.view = "landing";
+          this._goLanding();
           return;
         }
         this.reviewSummary = json.data;
+        this.reviewSessionId = String(sessionId);
         this.summaryView = 'wrong';
         this.view = "review";
+        if (!hydrate) this._setQuizPath(sessionId);
       } catch (e) {
         window.showToast(window.netErrMsg, "error");
-        this.view = "landing";
+        this._goLanding();
       }
     },
 
@@ -331,18 +372,25 @@ window.quizPage = function() {
       await this.startSession(replay);
     },
 
+    // User-initiated return to landing: record a history entry, then reset.
     async backToLanding() {
-      this.sessionId    = null;
-      this.currentQ     = null;
-      this.finalSummary = null;
-      this.summaryView  = 'wrong';
-      this.selection    = [];
-      this.feedback     = null;
-      if (!this.dashboard) {
-        await this.loadDashboard();
-      } else {
-        this.view = "landing";
-      }
+      this._setQuizPath(null);
+      await this._goLanding();
+    },
+
+    // Reset to landing without touching history (used by backToLanding and by
+    // URL sync on back/forward). Always reloads so a just-finished session shows
+    // in the recent list and mastery counts reflect the run.
+    async _goLanding() {
+      this.sessionId       = null;
+      this.currentQ        = null;
+      this.finalSummary    = null;
+      this.reviewSummary   = null;
+      this.reviewSessionId = null;
+      this.summaryView     = 'wrong';
+      this.selection       = [];
+      this.feedback        = null;
+      await this.loadDashboard();
     },
   };
 };

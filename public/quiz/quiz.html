@@ -65,15 +65,22 @@
       <!-- Recent sessions -->
       <hr class="section-divider" x-show="dashboard && dashboard.recent_sessions.length > 0">
       <div class="quiz-history" x-show="dashboard && dashboard.recent_sessions.length > 0">
-        <div class="quiz-history-head">
-          <span>Recent sessions</span>
-          <span class="quiz-history-legend">score · accuracy · time · best streak · when</span>
+        <div class="quiz-history-title">Recent sessions</div>
+        <div class="quiz-history-headrow" aria-hidden="true">
+          <span>Score</span>
+          <span>Accuracy</span>
+          <span>Time</span>
+          <span>Streak</span>
+          <span>When</span>
+          <span></span>
         </div>
         <template x-for="s in (dashboard?.recent_sessions || [])" :key="s.id">
           <div class="quiz-history-row" @click="viewSession(s.id)" title="Open this session to review answers">
-            <span class="quiz-history-score" :title="`${s.total_correct} correct of ${s.total_seen}`" x-text="`${s.total_correct}/${s.total_seen}`"></span>
-            <span class="quiz-history-pct" title="Accuracy" x-text="`(${s.accuracy}%)`"></span>
-            <span class="quiz-history-meta" x-text="`· ${formatDur(s.duration_sec)} · best ${s.best_streak} · ${ago(s.started_at)}`"></span>
+            <span class="quiz-history-score" x-text="`${s.total_correct}/${s.total_seen}`"></span>
+            <span class="quiz-history-pct" x-text="`${s.accuracy}%`"></span>
+            <span class="quiz-history-cell" x-text="formatDur(s.duration_sec)"></span>
+            <span class="quiz-history-cell" x-text="s.best_streak"></span>
+            <span class="quiz-history-cell" :title="ago(s.started_at)" x-text="when(s.started_at)"></span>
             <span class="quiz-history-arrow" aria-hidden="true">→</span>
           </div>
         </template>
@@ -104,7 +111,14 @@
         <div class="progress-track"><div class="progress-fill" :style="`transform:scaleX(${progressPct() / 100})`"></div></div>
       </header>
 
-      <div class="quiz-question" x-data="{ showTh: false }" x-init="$watch('currentQ', () => showTh = false)">
+      <div class="quiz-question" x-data="{ showTh: false }"
+           x-init="$watch('currentQ', () => {
+             showTh = false;
+             // Restart the slide-in: clear the animation, force reflow, re-apply.
+             // Needed now that advancing keeps the practice view mounted (no
+             // loading-view toggle to re-trigger the CSS animation).
+             $el.style.animation = 'none'; void $el.offsetWidth; $el.style.animation = '';
+           })">
         <div class="quiz-prompt-row">
           <div class="quiz-prompt-en" x-show="!showTh" x-text="currentQ?.prompt_en ?? ''"></div>
           <div class="quiz-prompt-th" x-cloak x-show="showTh && currentQ?.prompt_th" x-text="currentQ?.prompt_th ?? ''"></div>
@@ -231,19 +245,23 @@
                   </div>
                   <div class="quiz-answer-body-wrap" :class="{ 'is-open': open }">
                     <div class="quiz-answer-body">
-                      <ul class="quiz-answer-choices">
-                        <template x-for="c in w.choices" :key="c.label">
-                          <li :class="{
-                                'wrong-choice--correct': w.correct_labels.includes(c.label),
-                                'wrong-choice--yours':   w.selected_labels.includes(c.label)
-                              }">
-                            <strong x-text="c.label"></strong>
-                            <span x-text="c.text"></span>
-                          </li>
-                        </template>
-                      </ul>
-                      <p class="quiz-feedback-explanation"
-                         x-show="w.explanation" x-text="w.explanation"></p>
+                      <div class="quiz-answer-inner">
+                        <ul class="quiz-answer-choices">
+                          <template x-for="c in w.choices" :key="c.label">
+                            <li :class="{
+                                  'wrong-choice--correct': w.correct_labels.includes(c.label),
+                                  'wrong-choice--yours':   w.selected_labels.includes(c.label)
+                                }">
+                              <strong x-text="c.label"></strong>
+                              <span x-text="c.text"></span>
+                            </li>
+                          </template>
+                        </ul>
+                        <div class="quiz-answer-exple" x-show="w.explanation">
+                          <span class="quiz-answer-exple-label">Explanation</span>
+                          <p class="quiz-answer-exple-text" x-text="w.explanation"></p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -279,19 +297,23 @@
                   </div>
                   <div class="quiz-answer-body-wrap" :class="{ 'is-open': open }">
                     <div class="quiz-answer-body">
-                      <ul class="quiz-answer-choices">
-                        <template x-for="ch in c.choices" :key="ch.label">
-                          <li :class="{
-                                'correct-choice--yours': c.selected_labels.includes(ch.label),
-                                'wrong-choice--correct': c.correct_labels.includes(ch.label) && !c.selected_labels.includes(ch.label)
-                              }">
-                            <strong x-text="ch.label"></strong>
-                            <span x-text="ch.text"></span>
-                          </li>
-                        </template>
-                      </ul>
-                      <p class="quiz-feedback-explanation"
-                         x-show="c.explanation" x-text="c.explanation"></p>
+                      <div class="quiz-answer-inner">
+                        <ul class="quiz-answer-choices">
+                          <template x-for="ch in c.choices" :key="ch.label">
+                            <li :class="{
+                                  'correct-choice--yours': c.selected_labels.includes(ch.label),
+                                  'wrong-choice--correct': c.correct_labels.includes(ch.label) && !c.selected_labels.includes(ch.label)
+                                }">
+                              <strong x-text="ch.label"></strong>
+                              <span x-text="ch.text"></span>
+                            </li>
+                          </template>
+                        </ul>
+                        <div class="quiz-answer-exple" x-show="c.explanation">
+                          <span class="quiz-answer-exple-label">Explanation</span>
+                          <p class="quiz-answer-exple-text" x-text="c.explanation"></p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -302,11 +324,6 @@
             <p class="empty-state">No correct answers yet.</p>
           </template>
         </div>
-      </div>
-
-      <!-- Keep the momentum: rerun the same batch size -->
-      <div class="quiz-summary-footer">
-        <button class="btn-primary" @click="practiceAgain()">Practice again</button>
       </div>
     </div>
 
@@ -367,19 +384,23 @@
                   </div>
                   <div class="quiz-answer-body-wrap" :class="{ 'is-open': open }">
                     <div class="quiz-answer-body">
-                      <ul class="quiz-answer-choices">
-                        <template x-for="c in w.choices" :key="c.label">
-                          <li :class="{
-                                'wrong-choice--correct': w.correct_labels.includes(c.label),
-                                'wrong-choice--yours':   w.selected_labels.includes(c.label)
-                              }">
-                            <strong x-text="c.label"></strong>
-                            <span x-text="c.text"></span>
-                          </li>
-                        </template>
-                      </ul>
-                      <p class="quiz-feedback-explanation"
-                         x-show="w.explanation" x-text="w.explanation"></p>
+                      <div class="quiz-answer-inner">
+                        <ul class="quiz-answer-choices">
+                          <template x-for="c in w.choices" :key="c.label">
+                            <li :class="{
+                                  'wrong-choice--correct': w.correct_labels.includes(c.label),
+                                  'wrong-choice--yours':   w.selected_labels.includes(c.label)
+                                }">
+                              <strong x-text="c.label"></strong>
+                              <span x-text="c.text"></span>
+                            </li>
+                          </template>
+                        </ul>
+                        <div class="quiz-answer-exple" x-show="w.explanation">
+                          <span class="quiz-answer-exple-label">Explanation</span>
+                          <p class="quiz-answer-exple-text" x-text="w.explanation"></p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -415,19 +436,23 @@
                   </div>
                   <div class="quiz-answer-body-wrap" :class="{ 'is-open': open }">
                     <div class="quiz-answer-body">
-                      <ul class="quiz-answer-choices">
-                        <template x-for="ch in c.choices" :key="ch.label">
-                          <li :class="{
-                                'correct-choice--yours': c.selected_labels.includes(ch.label),
-                                'wrong-choice--correct': c.correct_labels.includes(ch.label) && !c.selected_labels.includes(ch.label)
-                              }">
-                            <strong x-text="ch.label"></strong>
-                            <span x-text="ch.text"></span>
-                          </li>
-                        </template>
-                      </ul>
-                      <p class="quiz-feedback-explanation"
-                         x-show="c.explanation" x-text="c.explanation"></p>
+                      <div class="quiz-answer-inner">
+                        <ul class="quiz-answer-choices">
+                          <template x-for="ch in c.choices" :key="ch.label">
+                            <li :class="{
+                                  'correct-choice--yours': c.selected_labels.includes(ch.label),
+                                  'wrong-choice--correct': c.correct_labels.includes(ch.label) && !c.selected_labels.includes(ch.label)
+                                }">
+                              <strong x-text="ch.label"></strong>
+                              <span x-text="ch.text"></span>
+                            </li>
+                          </template>
+                        </ul>
+                        <div class="quiz-answer-exple" x-show="c.explanation">
+                          <span class="quiz-answer-exple-label">Explanation</span>
+                          <p class="quiz-answer-exple-text" x-text="c.explanation"></p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
