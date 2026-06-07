@@ -11,6 +11,7 @@ reaches 2; mastered questions are excluded from ``next_question`` candidates.
 from __future__ import annotations
 
 import json
+import random
 from datetime import datetime, timezone
 from typing import Any
 
@@ -131,7 +132,7 @@ async def next_question(session_id: int) -> dict[str, Any] | None:
     async with db.execute(
         """
         SELECT q.id, q.prompt_en, q.prompt_th, q.choices_json,
-               q.correct_labels, q.image_filenames,
+               q.correct_labels, q.image_filenames, q.question_type, q.pairs_json,
                COALESCE(p.correct_streak, 0) AS current_streak
           FROM questions q
           LEFT JOIN question_progress p ON p.question_id = q.id
@@ -149,19 +150,33 @@ async def next_question(session_id: int) -> dict[str, Any] | None:
     if picked is None:
         return {"exhausted": True}
 
-    correct_count = len(json.loads(picked["correct_labels"]))
-    return {
-        "question_id":     picked["id"],
-        "prompt_en":       picked["prompt_en"],
-        "prompt_th":       picked["prompt_th"],
-        "choices":         json.loads(picked["choices_json"]),
-        "multi":           correct_count > 1,
+    base = {
+        "question_id":    picked["id"],
+        "prompt_en":      picked["prompt_en"],
+        "prompt_th":      picked["prompt_th"],
         "image_urls": [
             f"/api/quiz/images/{fname}"
             for fname in json.loads(picked["image_filenames"])
         ],
-        "current_streak":  picked["current_streak"],
-        "position":        {"seen": seen, "total": cap},
+        "current_streak": picked["current_streak"],
+        "position":       {"seen": seen, "total": cap},
+        "question_type":  picked["question_type"] or "mcq",
+    }
+
+    if (picked["question_type"] or "mcq") == "drag_drop":
+        pairs = json.loads(picked["pairs_json"] or "{}").get("pairs", [])
+        # Bank of left items (shuffled); buckets are the distinct right targets
+        # in authored order. The correct mapping is never sent to the client.
+        items = [p["left"] for p in pairs]
+        random.shuffle(items)
+        buckets: list[str] = list(dict.fromkeys(p["right"] for p in pairs))
+        return {**base, "items": items, "buckets": buckets}
+
+    correct_count = len(json.loads(picked["correct_labels"]))
+    return {
+        **base,
+        "choices": json.loads(picked["choices_json"]),
+        "multi":   correct_count > 1,
     }
 
 
@@ -171,20 +186,19 @@ async def submit_answer(
     session_id: int,
     question_id: int,
     selected_labels: list[str],
+    matches: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     """Persist an answer and return correctness + reveal info.
 
-    Returns:
-      * ``None``              — question doesn't exist
-      * ``ALREADY_ANSWERED``  — repeated submit for this (session, question)
-      * ``{is_correct, correct_labels, explanation}`` on success
-
-    Also updates ``question_progress.correct_streak`` and
-    ``quiz_sessions.best_streak``.
+    ``selected_labels`` is used for mcq questions; ``matches`` (item→bucket) for
+    drag_drop. Returns ``None`` if the question doesn't exist, ``ALREADY_ANSWERED``
+    on a repeat submit, else the reveal payload. Also updates per-question and
+    per-session streaks.
     """
     db = await get_db()
     async with db.execute(
-        "SELECT correct_labels, explanation FROM questions WHERE id = ?",
+        "SELECT correct_labels, explanation, question_type, pairs_json "
+        "FROM questions WHERE id = ?",
         (question_id,),
     ) as cur:
         row = await cur.fetchone()
@@ -196,21 +210,51 @@ async def submit_answer(
     ) as cur:
         if await cur.fetchone() is not None:
             return ALREADY_ANSWERED
-    correct_labels = json.loads(row["correct_labels"])
-    if not correct_labels:
-        # Defence in depth: a quizable question must have at least one
-        # correct label. Empty would make any selection 'correct'.
-        return None
-    normalized_selected = sorted(label.upper() for label in selected_labels)
-    normalized_correct  = sorted(label.upper() for label in correct_labels)
-    is_correct = normalized_selected == normalized_correct
+
+    qtype = row["question_type"] or "mcq"
+    if qtype == "drag_drop":
+        pairs = json.loads(row["pairs_json"] or "{}").get("pairs", [])
+        if not pairs:
+            return None  # not actually answerable
+        authored = {p["left"]: p["right"] for p in pairs}
+        matches = matches or {}
+        is_correct = (
+            len(matches) == len(authored)
+            and all(matches.get(left) == right for left, right in authored.items())
+        )
+        # Store as a JSON list so the summary's json.loads stays list-shaped.
+        persisted = json.dumps(
+            [f"{left} → {bucket}" for left, bucket in matches.items()],
+            ensure_ascii=False,
+        )
+        reveal: dict[str, Any] = {
+            "question_type": "drag_drop",
+            "pairs":         pairs,        # correct mapping (reveal after submit)
+            "your_matches":  matches,
+            "explanation":   row["explanation"],
+        }
+    else:
+        correct_labels = json.loads(row["correct_labels"])
+        if not correct_labels:
+            # Defence in depth: a quizable mcq must have at least one correct
+            # label. Empty would make any selection 'correct'.
+            return None
+        normalized_selected = sorted(label.upper() for label in selected_labels)
+        normalized_correct  = sorted(label.upper() for label in correct_labels)
+        is_correct = normalized_selected == normalized_correct
+        persisted = json.dumps(selected_labels)
+        reveal = {
+            "question_type":  "mcq",
+            "correct_labels": correct_labels,
+            "explanation":    row["explanation"],
+        }
 
     now = _now_iso()
     await db.execute(
         """INSERT INTO quiz_answers
              (session_id, question_id, selected_labels, is_correct, answered_at)
            VALUES (?, ?, ?, ?, ?)""",
-        (session_id, question_id, json.dumps(selected_labels), int(is_correct), now),
+        (session_id, question_id, persisted, int(is_correct), now),
     )
     await _bump_question_progress(db, question_id, is_correct, now)
 
@@ -226,11 +270,7 @@ async def submit_answer(
         (int(is_correct), cur_streak, session_id),
     )
     await db.commit()
-    return {
-        "is_correct":     is_correct,
-        "correct_labels": correct_labels,
-        "explanation":    row["explanation"],
-    }
+    return {"is_correct": is_correct, **reveal}
 
 
 async def dont_know(session_id: int, question_id: int) -> dict[str, Any] | None:

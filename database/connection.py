@@ -10,7 +10,7 @@ QUIZ_SCHEMA_PATH = Path(__file__).parent / "quiz_schema.sql"
 
 _db: aiosqlite.Connection | None = None
 _db_lock = asyncio.Lock()
-_ALLOWED_MIGRATION_TABLES = frozenset({"labs", "progress", "attempts", "quiz_sessions"})
+_ALLOWED_MIGRATION_TABLES = frozenset({"labs", "progress", "attempts", "quiz_sessions", "questions"})
 
 
 async def _add_column_if_missing(
@@ -51,6 +51,10 @@ async def _run_schema_migrations(db: aiosqlite.Connection) -> None:
     # v2 quiz columns — additive, idempotent.
     await _add_column_if_missing(db, "quiz_sessions", "batch_size",  "INTEGER")
     await _add_column_if_missing(db, "quiz_sessions", "best_streak", "INTEGER NOT NULL DEFAULT 0")
+    # Drag-and-drop support: a second question type whose answer is a set of
+    # left→right (item→bucket) pairs, authored into questions.pairs_json.
+    await _add_column_if_missing(db, "questions", "question_type", "TEXT NOT NULL DEFAULT 'mcq'")
+    await _add_column_if_missing(db, "questions", "pairs_json",    "TEXT")
 
 
 async def _cleanup_stale_attempts(db: aiosqlite.Connection) -> None:

@@ -279,6 +279,94 @@
   font-size: 13px;
 }
 
+/* ── Drag-and-drop matcher ──────────────────────────────────────────────── */
+.dd {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.dd-bank-label,
+.dd-bucket-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+  margin-bottom: 8px;
+}
+.dd-bank {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px;
+  background: var(--surface-2);
+  border: 1px dashed var(--border-2);
+  border-radius: 10px;
+}
+.dd-item {
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text);
+  cursor: grab;
+  user-select: none;
+}
+.dd-item:active { cursor: grabbing; }
+.dd-item--picked {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  box-shadow: 0 0 0 2px var(--accent-tint);
+}
+.dd-item--correct {
+  border-color: var(--done);
+  background: var(--surface-tint-done);
+  color: var(--done);
+  cursor: default;
+}
+.dd-item--wrong {
+  border-color: var(--reset);
+  background: var(--reset-tint);
+  color: var(--reset);
+  cursor: default;
+}
+/* SortableJS drag states */
+.sortable-ghost { opacity: 0.4; }
+.sortable-chosen { box-shadow: var(--shadow); }
+
+.dd-buckets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.dd-bucket {
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.dd-bucket--target { border-color: var(--accent); cursor: pointer; }
+.dd-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 56px;
+  padding: 8px;
+  border: 1px dashed var(--border-2);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.dd-zone:empty::before {
+  content: "drop here";
+  color: var(--text-4);
+  font-size: 12px;
+  align-self: center;
+  margin: auto;
+}
+
 /* Feedback */
 .quiz-feedback {
   padding: 14px 16px;

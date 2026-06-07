@@ -21,6 +21,9 @@ window.quizPage = function() {
     feedback: null,
     submitting: false,
     loadingNext: false,      // in-session fetch; keeps the question on screen
+    ddPicked: null,          // drag-drop: item selected for click-to-assign
+    ddRemaining: 0,          // drag-drop: items still in the bank (gates submit)
+    _ddSortables: [],
     finalSummary: null,
     reviewSummary: null,
     reviewSessionId: null,   // id currently shown in review (for URL sync)
@@ -71,8 +74,10 @@ window.quizPage = function() {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       if (this.view === "practice" && this.currentQ) {
-        const choices = this.currentQ.choices || [];
-        if (/^[1-9]$/.test(e.key)) {
+        const isDrag = this.currentQ.question_type === "drag_drop";
+        // Number-key choice picking is mcq-only (drag-drop has no labels).
+        if (!isDrag && /^[1-9]$/.test(e.key)) {
+          const choices = this.currentQ.choices || [];
           const idx = parseInt(e.key, 10) - 1;
           if (idx < choices.length && !this.feedback) {
             this.toggleChoice(choices[idx].label);
@@ -81,8 +86,15 @@ window.quizPage = function() {
           return;
         }
         if (e.key === "Enter") {
-          if (this.feedback) { if (!this.loadingNext) this.fetchNext(); }
-          else if (this.selection.length && !this.submitting) this.submit();
+          if (this.feedback) {
+            if (!this.loadingNext) this.fetchNext();
+          } else if (this.submitting) {
+            /* in flight */
+          } else if (isDrag) {
+            if (this.ddRemaining === 0) this.submit();
+          } else if (this.selection.length) {
+            this.submit();
+          }
           e.preventDefault();
         }
       } else if (this.view === "landing") {
@@ -224,6 +236,8 @@ window.quizPage = function() {
       else this.view = "loading";
       this.selection = [];
       this.feedback = null;
+      this.ddPicked = null;
+      this.ddRemaining = 0;
       try {
         const json = await api(`/api/quiz/sessions/${this.sessionId}/next`);
         if (!json.success) {
@@ -261,18 +275,107 @@ window.quizPage = function() {
     },
     isSelected(label)     { return this.selection.includes(label); },
     isCorrectLabel(label) {
-      return !!this.feedback && this.feedback.correct_labels.includes(label);
+      return !!this.feedback && (this.feedback.correct_labels || []).includes(label);
+    },
+
+    // ── Drag-and-drop ────────────────────────────────────────────────────
+    // SortableJS owns the item DOM (items are built here, not via Alpine x-for,
+    // which would churn against Sortable's moves). Handlers use the stored root
+    // element — never Alpine magics — so they also work from native listeners.
+    // A tap-to-assign fallback covers keyboard/touch.
+    initDragDrop(root) {
+      root = root || this._ddRoot;
+      if (!root || typeof Sortable === "undefined") return;
+      this._ddRoot = root;
+      this._ddPickedEl = null;
+      (this._ddSortables || []).forEach((s) => { try { s.destroy(); } catch (e) {} });
+      this._ddSortables = [];
+
+      const bank = root.querySelector(".dd-bank");
+      if (!bank) return;
+      bank.innerHTML = "";
+      for (const item of this.currentQ.items || []) {
+        const el = document.createElement("div");
+        el.className = "dd-item";
+        el.dataset.item = item;
+        el.textContent = item;
+        el.addEventListener("click", (ev) => { ev.stopPropagation(); this._ddPickEl(el); });
+        bank.appendChild(el);
+      }
+
+      const opts = { group: "dd", animation: 150, onSort: () => this.ddRecount() };
+      this._ddSortables.push(Sortable.create(bank, opts));
+      root.querySelectorAll(".dd-bucket").forEach((bk) => {
+        const zone = bk.querySelector(".dd-zone");
+        this._ddSortables.push(Sortable.create(zone, opts));
+        bk.onclick = () => this._ddDropPickedEl(zone);   // onclick = no listener stacking
+      });
+      this.ddRecount();
+    },
+    _ddPickEl(el) {
+      if (this.feedback) return;
+      if (this._ddPickedEl === el) {
+        el.classList.remove("dd-item--picked");
+        this._ddPickedEl = null;
+        return;
+      }
+      if (this._ddPickedEl) this._ddPickedEl.classList.remove("dd-item--picked");
+      this._ddPickedEl = el;
+      el.classList.add("dd-item--picked");
+    },
+    _ddDropPickedEl(zone) {
+      if (this.feedback || !this._ddPickedEl) return;
+      zone.appendChild(this._ddPickedEl);
+      this._ddPickedEl.classList.remove("dd-item--picked");
+      this._ddPickedEl = null;
+      this.ddRecount();
+    },
+    ddRecount() {
+      const bank = this._ddRoot && this._ddRoot.querySelector(".dd-bank");
+      this.ddRemaining = bank ? bank.querySelectorAll(".dd-item").length : 0;
+    },
+    ddCollectMatches() {
+      const matches = {};
+      if (!this._ddRoot) return matches;
+      this._ddRoot.querySelectorAll(".dd-zone").forEach((zone) => {
+        const bucket = zone.dataset.bucket;
+        zone.querySelectorAll(".dd-item").forEach((el) => {
+          matches[el.dataset.item] = bucket;
+        });
+      });
+      return matches;
+    },
+    ddShowFeedback() {
+      if (!this._ddRoot) return;
+      (this._ddSortables || []).forEach((s) => { try { s.destroy(); } catch (e) {} });
+      this._ddSortables = [];
+      const authored = {};
+      (this.feedback.pairs || []).forEach((p) => { authored[p.left] = p.right; });
+      this._ddRoot.querySelectorAll(".dd-zone .dd-item").forEach((el) => {
+        const inBucket = el.closest(".dd-zone").dataset.bucket;
+        const ok = authored[el.dataset.item] === inBucket;
+        el.classList.add(ok ? "dd-item--correct" : "dd-item--wrong");
+      });
     },
 
     async submit() {
-      if (!this.selection.length || this.feedback || this.submitting) return;
+      if (this.feedback || this.submitting) return;
+      const isDrag = this.currentQ?.question_type === "drag_drop";
+      let body;
+      if (isDrag) {
+        const matches = this.ddCollectMatches();
+        if (Object.keys(matches).length < (this.currentQ.items || []).length) return;
+        body = { question_id: this.currentQ.question_id, matches };
+      } else {
+        if (!this.selection.length) return;
+        body = { question_id: this.currentQ.question_id, selected_labels: this.selection };
+      }
       this.submitting = true;
       this.lastQSec = Math.round((Date.now() - this._qStartedAt) / 1000);
       try {
         const json = await api(`/api/quiz/sessions/${this.sessionId}/answers`, {
           method: "POST",
-          body: { question_id: this.currentQ.question_id,
-                  selected_labels: this.selection },
+          body,
         });
         if (!json.success) {
           // ALREADY_ANSWERED: advance instead of trapping user
@@ -284,6 +387,7 @@ window.quizPage = function() {
           return;
         }
         this.feedback = json.data;
+        if (isDrag) this.$nextTick(() => this.ddShowFeedback());
       } catch (e) {
         window.showToast(window.netErrMsg, "error");
       } finally {

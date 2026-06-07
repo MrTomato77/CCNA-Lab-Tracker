@@ -144,7 +144,7 @@
           </div>
         </template>
 
-        <div class="quiz-choices">
+        <div class="quiz-choices" x-show="currentQ?.question_type !== 'drag_drop'">
           <template x-for="choice in (currentQ?.choices || [])" :key="choice.label">
             <button class="quiz-choice"
                     :class="{
@@ -162,6 +162,27 @@
           </template>
         </div>
 
+        <!-- Drag-and-drop matcher: drag items from the bank into a bucket, or
+             tap an item then tap a bucket (keyboard/touch fallback). -->
+        <div class="dd" x-ref="ddRoot"
+             x-show="currentQ?.question_type === 'drag_drop'"
+             x-effect="currentQ && currentQ.question_type === 'drag_drop' && $nextTick(() => initDragDrop($refs.ddRoot))">
+          <div class="dd-bank-wrap">
+            <div class="dd-bank-label">Items</div>
+            <!-- Items are built in JS (initDragDrop) so SortableJS, not Alpine
+                 x-for, owns these nodes — mixing the two churns the DOM. -->
+            <div class="dd-bank"></div>
+          </div>
+          <div class="dd-buckets">
+            <template x-for="b in (currentQ?.buckets || [])" :key="b">
+              <div class="dd-bucket">
+                <div class="dd-bucket-label" x-text="b"></div>
+                <div class="dd-zone" :data-bucket="b"></div>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <!-- Feedback panel only when there's an explanation -->
         <template x-if="feedback && feedback.explanation">
           <div class="quiz-feedback"
@@ -172,13 +193,14 @@
         </template>
 
         <div class="quiz-actions">
-          <span class="quiz-kbd-hint" x-show="!feedback" aria-hidden="true">Keys <kbd>1</kbd>–<kbd x-text="String(Math.min(9, currentQ?.choices?.length ?? 0))"></kbd> to pick, <kbd>Enter</kbd> to submit</span>
+          <span class="quiz-kbd-hint" x-show="!feedback && currentQ?.question_type !== 'drag_drop'" aria-hidden="true">Keys <kbd>1</kbd>–<kbd x-text="String(Math.min(9, currentQ?.choices?.length ?? 0))"></kbd> to pick, <kbd>Enter</kbd> to submit</span>
+          <span class="quiz-kbd-hint" x-show="!feedback && currentQ?.question_type === 'drag_drop'" aria-hidden="true">Drag items into a bucket, or tap an item then a bucket</span>
           <span class="quiz-kbd-hint" x-show="feedback" aria-hidden="true"><kbd>Enter</kbd> for next</span>
           <button class="btn-primary btn-primary--ghost" x-show="!feedback"
                   :disabled="submitting"
                   @click="iDontKnow()">I don't know</button>
           <button class="btn-primary" x-show="!feedback"
-                  :disabled="selection.length === 0 || submitting"
+                  :disabled="submitting || (currentQ?.question_type === 'drag_drop' ? ddRemaining > 0 : selection.length === 0)"
                   @click="submit()">Submit answer</button>
           <button class="btn-primary" x-show="feedback" :disabled="loadingNext" @click="fetchNext()">
             <span x-show="!loadingNext">Next →</span>

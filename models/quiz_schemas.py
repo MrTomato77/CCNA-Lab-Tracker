@@ -1,7 +1,7 @@
 """Pydantic schemas for the quiz API."""
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 _BATCH_INTS = {25, 50, 75, 100}
@@ -21,8 +21,11 @@ class SessionStart(BaseModel):
 
 
 class AnswerSubmit(BaseModel):
+    # mcq answers use selected_labels; drag_drop answers use matches (item→bucket).
+    # Exactly one must be provided.
     question_id: int
-    selected_labels: list[str]
+    selected_labels: list[str] = []
+    matches: dict[str, str] | None = None
 
     @field_validator("question_id")
     @classmethod
@@ -34,8 +37,7 @@ class AnswerSubmit(BaseModel):
     @field_validator("selected_labels")
     @classmethod
     def labels_are_clean(cls, v: list[str]) -> list[str]:
-        if not v:
-            raise ValueError("selected_labels must not be empty")
+        # May be empty for drag_drop (validated in the model check below).
         if len(v) > 6:
             raise ValueError("too many labels")
         normalized: list[str] = []
@@ -50,6 +52,24 @@ class AnswerSubmit(BaseModel):
         if len(set(normalized)) != len(normalized):
             raise ValueError("duplicate labels not allowed")
         return normalized
+
+    @model_validator(mode="after")
+    def exactly_one_mode(self) -> "AnswerSubmit":
+        has_labels = bool(self.selected_labels)
+        has_matches = bool(self.matches)
+        if has_labels == has_matches:
+            raise ValueError("provide either selected_labels (mcq) or matches (drag_drop)")
+        if self.matches is not None:
+            if len(self.matches) > 12:
+                raise ValueError("too many matches")
+            for left, bucket in self.matches.items():
+                if not isinstance(left, str) or not isinstance(bucket, str):
+                    raise ValueError("matches must be string→string")
+                if not left or not bucket:
+                    raise ValueError("match keys/values must be non-empty")
+                if len(left) > 400 or len(bucket) > 200:
+                    raise ValueError("match text too long")
+        return self
 
 
 class DontKnowSubmit(BaseModel):

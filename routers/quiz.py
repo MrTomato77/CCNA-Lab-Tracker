@@ -9,7 +9,7 @@ from services import image_service, quiz_service
 
 router = SubRouter(__name__, prefix="/api/quiz")
 
-_MAX_ANSWER_BODY = 512
+_MAX_ANSWER_BODY = 8192  # drag-drop matches carry item/bucket text, not just labels
 
 
 def _parse_session_id(request: Request) -> int | ErrorResponse:
@@ -78,7 +78,9 @@ async def submit_answer(request: Request) -> dict | ErrorResponse:
         data = AnswerSubmit.model_validate_json(request.body)
     except ValidationError as e:
         return validation_error(e)
-    result = await quiz_service.submit_answer(sid, data.question_id, data.selected_labels)
+    result = await quiz_service.submit_answer(
+        sid, data.question_id, data.selected_labels, data.matches
+    )
     if result is None:
         return api_error("Question not found.", "QUESTION_NOT_FOUND", 404)
     if result is quiz_service.ALREADY_ANSWERED:

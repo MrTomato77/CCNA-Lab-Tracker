@@ -36,7 +36,7 @@ sys.path.insert(0, str(ROOT))
 
 from core.exam_pools import POOL_VALUES, TOPIC_TO_POOL  # noqa: E402
 
-SOURCE_DOCX = ROOT / "docs" / "200-301 Cert Empire x990.docx"
+SOURCE_DOCX = ROOT / "quiz" / "200-301 Cert Empire x990.docx"
 IMAGES_DIR  = ROOT / "data" / "quiz_images"
 DB_PATH     = ROOT / "database" / "labs.db"
 
@@ -75,6 +75,7 @@ class ParsedQuestion:
     source_table:    int
     image_filenames: list[str] = field(default_factory=list)
     needs_review:    bool = False
+    question_type:   str = "mcq"   # 'mcq' | 'drag_drop'
 
 
 def parse_header_text(text: str) -> tuple[int, int, str] | None:
@@ -245,6 +246,12 @@ def classify_table(table: Table, source_index: int) -> ParsedQuestion | None:
 
     explanation = " ".join(t for t in post_choice_dups if t) or None
 
+    # Drag-and-drop questions present their items/answer as images, not as
+    # parseable choice rows. Tag the type so the loader/UI can treat them
+    # specially; pairs are authored separately (data/drag_drop_pairs.json).
+    is_drag = "drag" in prompt_en.lower() and "drop" in prompt_en.lower()
+    question_type = "drag_drop" if is_drag else "mcq"
+
     review_reasons = []
     if not prompt_en:
         review_reasons.append("missing EN prompt")
@@ -271,6 +278,7 @@ def classify_table(table: Table, source_index: int) -> ParsedQuestion | None:
         source_table=source_index,
         image_filenames=[],
         needs_review=needs_review,
+        question_type=question_type,
     )
 
 
@@ -321,8 +329,8 @@ async def upsert_question(db: aiosqlite.Connection, q: ParsedQuestion) -> None:
         INSERT OR REPLACE INTO questions
             (id, pool, topic, prompt_en, prompt_th, choices_json,
              correct_labels, explanation, source_table,
-             image_filenames, needs_review)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             image_filenames, needs_review, question_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             q.id,
@@ -336,6 +344,7 @@ async def upsert_question(db: aiosqlite.Connection, q: ParsedQuestion) -> None:
             q.source_table,
             json.dumps(q.image_filenames),
             int(q.needs_review),
+            q.question_type,
         ),
     )
 
