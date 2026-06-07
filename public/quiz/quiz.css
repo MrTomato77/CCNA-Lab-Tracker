@@ -279,11 +279,17 @@
   font-size: 13px;
 }
 
-/* ── Drag-and-drop matcher ──────────────────────────────────────────────── */
+/* ── Drag-and-drop matcher ──────────────────────────────────────────────────
+   Left → right layout to match the source images and the real CCNA exam:
+   the item bank sits on the left, the buckets (drop targets) on the right. */
 .dd {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 1.4fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .dd { grid-template-columns: 1fr; }   /* stack on narrow screens */
 }
 .dd-bank-label,
 .dd-bucket-label {
@@ -296,7 +302,7 @@
 }
 .dd-bank {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   min-height: 48px;
   padding: 10px;
@@ -338,8 +344,8 @@
 .sortable-chosen { box-shadow: var(--shadow); }
 
 .dd-buckets {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 .dd-bucket {
